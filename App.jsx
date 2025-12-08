@@ -28,12 +28,14 @@ function App() {
     const { data: walletClient } = useWalletClient();
     
     const [recipientAddress, setRecipientAddress] = useState('');
+    const [recipientENS, setRecipientENS] = useState('');
     const [subjectText, setSubjectText] = useState('');
     const [messageText, setMessageText] = useState('');
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [sendStatus, setSendStatus] = useState('');
     const [saveOutbox, setSaveOutbox] = useState(false);
+    const [ensCache, setEnsCache] = useState(new Map());
 
     useEffect(() => {
         initDB();
@@ -87,6 +89,69 @@ function App() {
         }
     };
 
+    const resolveENSOrAddress = async (input, provider) => {
+        if (!input) return null;
+        
+        // If it's already an address, return it
+        if (input.match(/^0x[a-fA-F0-9]{40}$/)) {
+            return input;
+        }
+        
+        // If it ends with .eth, resolve ENS
+        if (input.endsWith('.eth')) {
+            try {
+                const resolvedAddress = await provider.resolveName(input);
+                if (resolvedAddress) {
+                    return resolvedAddress;
+                }
+                throw new Error('ENS name not found');
+            } catch (error) {
+                throw new Error(`Failed to resolve ENS name: ${input}`);
+            }
+        }
+        
+        throw new Error('Invalid address or ENS name');
+    };
+
+    const lookupENS = async (address, provider) => {
+        // Check cache first
+        if (ensCache.has(address)) {
+            return ensCache.get(address);
+        }
+        
+        try {
+            const ensName = await provider.lookupAddress(address);
+            if (ensName) {
+                setEnsCache(prev => new Map(prev).set(address, ensName));
+                return ensName;
+            }
+        } catch (error) {
+            console.log('No ENS found for', address);
+        }
+        return null;
+    };
+
+    const handleRecipientChange = async (e) => {
+        const input = e.target.value;
+        setRecipientAddress(input);
+        
+        // Clear ENS display
+        setRecipientENS('');
+        
+        // If input ends with .eth, try to resolve it
+        if (input.endsWith('.eth') && walletClient) {
+            try {
+                const provider = new BrowserProvider(walletClient);
+                const resolved = await provider.resolveName(input);
+                if (resolved) {
+                    setRecipientENS(`→ ${resolved.slice(0, 6)}...${resolved.slice(-4)}`);
+                }
+            } catch (error) {
+                setRecipientENS('❌ Not found');
+            }
+        }
+    };
+
     const handleSendMessage = async (e) => {
         e.preventDefault();
         
@@ -102,10 +167,16 @@ function App() {
             const provider = new BrowserProvider(walletClient);
             const signer = await provider.getSigner();
 
+            // Resolve ENS if needed
+            const resolvedAddress = await resolveENSOrAddress(recipientAddress, provider);
+            if (!resolvedAddress) {
+                throw new Error('Invalid recipient address or ENS name');
+            }
+
             // Encrypt message with subject
             const encryptedData = await encryptMessageForRecipient(
                 messageText,
-                recipientAddress,
+                resolvedAddress,
                 address,
                 saveOutbox,
                 subjectText
@@ -115,7 +186,7 @@ function App() {
 
             // Send as ethscription
             const result = await sendEncryptedMessage(
-                recipientAddress,
+                resolvedAddress,
                 encryptedData,
                 address,
                 provider,
@@ -185,11 +256,17 @@ function App() {
                         
                         const decryptedData = await decryptMessage(privateKey, encryptedData);
                         if (decryptedData) {
+                            const senderAddr = decryptedData.senderAddress || msg.from;
+                            
+                            // Lookup ENS for sender
+                            const ensName = await lookupENS(senderAddr, provider);
+                            
                             const updatedMsg = { 
                                 ...msg, 
                                 subject: decryptedData.subject,
                                 decrypted: decryptedData.message,
-                                senderAddress: decryptedData.senderAddress || msg.from
+                                senderAddress: senderAddr,
+                                senderENS: ensName
                             };
                             await storeMessage(updatedMsg);
                             return updatedMsg;
@@ -232,6 +309,7 @@ function App() {
             <header className="app-header">
                 <div className="header-left">
                     <h1 className="logo">
+                        <span className="logo-emoji">⛓️</span>
                         <span className="logo-chain">Chain</span><span className="logo-mail">mail</span>
                     </h1>
                 </div>
@@ -243,20 +321,20 @@ function App() {
             {isConnected && (
                 <div>
                     {/* Send Message Section */}
-                    <div className="section card">
+                    <div className="section">
                         <h2>✉️ Send Encrypted Message</h2>
                         <form onSubmit={handleSendMessage}>
                             <div className="form-group">
-                                <label htmlFor="recipient-address">Recipient Address:</label>
+                                <label htmlFor="recipient-address">Recipient Address or ENS:</label>
                                 <input 
                                     type="text" 
                                     id="recipient-address" 
-                                    placeholder="0x..." 
+                                    placeholder="0x... or name.eth" 
                                     value={recipientAddress}
-                                    onChange={(e) => setRecipientAddress(e.target.value)}
+                                    onChange={handleRecipientChange}
                                     required
-                                    pattern="^0x[a-fA-F0-9]{40}$"
                                 />
+                                {recipientENS && <small className="ens-helper">{recipientENS}</small>}
                             </div>
                             <div className="form-group">
                                 <label htmlFor="subject-text">Subject: (optional, encrypted)</label>
@@ -301,7 +379,7 @@ function App() {
                     </div>
 
                     {/* Received Messages Section */}
-                    <div className="section card">
+                    <div className="section">
                         <h2>📥 Your Messages</h2>
                         <button onClick={loadMessages} className="btn btn-secondary">
                             Refresh Messages
@@ -319,7 +397,7 @@ function App() {
                                     <div key={msg.txHash} className="message-item">
                                         <div className="message-header">
                                             <span className="message-from">
-                                                From: {(msg.senderAddress || msg.from).slice(0, 6)}...{(msg.senderAddress || msg.from).slice(-4)}
+                                                From: {msg.senderENS || `${(msg.senderAddress || msg.from).slice(0, 6)}...${(msg.senderAddress || msg.from).slice(-4)}`}
                                                 {!msg.senderAddress && msg.decrypted && !msg.decrypted.startsWith('[') && (
                                                     <span className="ephemeral-badge" title="Ephemeral message - sender cannot decrypt">🔒</span>
                                                 )}
