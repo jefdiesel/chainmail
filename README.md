@@ -1,132 +1,75 @@
-# ChainFeed - Encrypted Ethscription Messaging
 
-A decentralized, end-to-end encrypted messaging app on Ethereum. Messages are encrypted using deterministic ECDH key derivation from wallet addresses and stored as ethscriptions (on-chain calldata). No server required - all encryption happens client-side.
+# Chainmail — Encrypted On-Chain Messaging
 
-## Features
+Chainmail is a browser-based end-to-end encrypted messaging app that stores encrypted messages on-chain as ethscriptions. It encrypts subjects and message bodies together using deterministic ECDH key derivation (from Ethereum addresses) and AES-256-GCM.
 
-- 🔐 **End-to-End Encryption**: Deterministic ECDH + AES-256-GCM encryption
-- 🔑 **No Private Key Export**: Keys derived directly from your Ethereum address
-- 📬 **On-Chain Storage**: All messages stored as ethscriptions on Ethereum mainnet
-- 💾 **Local Caching**: Messages cached in IndexedDB for instant loading
-- 🌐 **Fully Decentralized**: No backend servers, all crypto happens in browser
-- 🎨 **Clean UI**: Built with React 19 and RainbowKit wallet integration
+Key features
+------------
 
-## How It Works
+- End-to-end encryption (ECDH-derived keys + AES-256-GCM)
+- Optional outbox copy (disable forward secrecy to allow sender decryption)
+- Ephemeral messages for forward secrecy (sender cannot decrypt later)
+- ENS support for sending and displaying names
+- Historical message fetching via Alchemy (requires API key)
 
-1. **Deterministic Key Derivation**
-   - Each Ethereum address generates a deterministic ECDSA keypair
-   - Derived using: `keccak256(address.toLowerCase() + "SecureChat")`
-   - No private key exports needed - keys are reproducible from address
-   
-2. **ECDH Encryption**
-   - Sender derives their own keypair and recipient's public key
-   - Computes shared secret using ECDH (sender private + recipient public)
-   - Encrypts message with AES-256-GCM using shared secret
-   - Encrypted data includes sender's public key for decryption
-   
-3. **Ethscription Storage**
-   - Encrypted message sent as transaction calldata
-   - Format: `data:,{"p":"chainfeed.online","op":"msg"}<base64_encrypted_data>`
-   - Sent to recipient's address with 0 ETH value
-   - ~200 bytes per message (vs ~2900 bytes with HTML format)
-   
-4. **Message Retrieval & Decryption**
-   - App queries Alchemy API for transactions to your address
-   - Filters for chainfeed.online protocol messages
-   - Recipient derives their private key and sender's public key
-   - Computes same shared secret and decrypts using AES-GCM
+Quick start
+-----------
 
-## Installation
+1. Install dependencies
 
 ```bash
 npm install
 ```
 
-## Environment Setup
-
-Create a `.env` file with your Alchemy API key:
+2. Local development
 
 ```bash
-VITE_ALCHEMY_API_KEY=your_api_key_here
-```
-
-## Development
-
-```bash
-npm install
+# Copy example env and add key
+cp .env.example .env
+# Add your Alchemy API key in .env
 npm run dev
 ```
 
-Opens at http://localhost:3000 (or 3001 if 3000 is in use)
+Open http://localhost:3000
 
-## Building
+Deployment (Vercel)
+-------------------
 
-```bash
-npm run build
-```
+Add the environment variable in your Vercel project settings:
 
-## Usage
+- `VITE_ALCHEMY_API_KEY` — your Alchemy API key (optional but required for historical fetching)
 
-1. **Connect Wallet**: Click "Connect Wallet" using RainbowKit (supports MetaMask, WalletConnect, etc.)
-2. **Send Message**: 
-   - Enter recipient's Ethereum address
-   - Type your message
-   - Click "Send Encrypted Message"
-   - Confirm the transaction in your wallet
-3. **Receive Messages**: 
-   - Messages automatically load when you connect
-   - Click "Refresh Messages" to check for new ones
+If the key is not present, the app will run but will not be able to fetch past messages from the chain.
 
-## Security Notes
+Files of interest
+-----------------
 
-⚠️ **Important**: This is experimental cryptographic software. 
+- `App.jsx` — main UI and orchestration
+- `crypto.js` — encryption and decryption logic (ECDH + AES-GCM)
+- `ethscription.js` — fetching/parsing ethscriptions and Alchemy interactions
+- `messageIndex.js` — IndexedDB cache
+- `styles.css` — theme and layout
 
-- Messages are encrypted end-to-end using deterministic ECDH
-- Only the intended recipient can decrypt messages (no one else, including you after sending)
-- Keys are derived from your Ethereum address - no private key exports
-- Each address always generates the same keypair (deterministic)
-- No signatures required - keys derived directly from address
-- Old messages (before block 23969000) are filtered out
+About & source
+--------------
 
-## Technical Stack
+Visit the project repository: https://github.com/jefdiesel/chainmail
 
-- **Frontend**: React 19, RainbowKit 2.2, Wagmi 2.x, Viem 2.x
-- **Blockchain**: Ethereum Mainnet (ethers.js v6)
-- **Encryption**: Deterministic ECDH + AES-256-GCM (Web Crypto API)
-- **APIs**: Alchemy for transaction history, Ethscriptions API fallback
-- **Storage**: IndexedDB for message caching with 5-minute TTL
-- **Build**: Vite 5.4
+Security notes
+--------------
 
-## Protocol
+This is experimental software. Use with caution:
 
-### Message Format
-```
-data:,{"p":"chainfeed.online","op":"msg"}<base64_json>
+- Keys are derived deterministically from addresses (no private key export)
+- Ephemeral messages cannot be decrypted by the sender later (forward secrecy)
+- Saving to outbox disables forward secrecy so the sender can decrypt later
 
-Base64 decoded JSON:
-{
-  "senderPublicKey": "0x04...",
-  "iv": "hex_string",
-  "ciphertext": "hex_string"
-}
-```
-
-Where:
-- `p`: Protocol identifier (chainfeed.online)
-- `op`: Operation type (msg = message, notify = notification)
-- `senderPublicKey`: Sender's deterministic public key for ECDH
-- `iv`: AES-GCM initialization vector (12 bytes)
-- `ciphertext`: AES-256-GCM encrypted message
-
-## Inspired By
-
-- [textmessage.eth](https://github.com/hunterlong/textmessage.eth) - On-chain messaging patterns
-- [web3-group-encryption](https://github.com/d1ll0n/web3-group-encryption) - ECDH key management
-
-## License
+License
+-------
 
 MIT
 
-## Author
+Author
+------
 
-Built with ❤️ for secure, decentralized communication
+Built by jefdiesel — https://github.com/jefdiesel/chainmail

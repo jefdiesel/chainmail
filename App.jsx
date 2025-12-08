@@ -36,6 +36,7 @@ function App() {
     const [sendStatus, setSendStatus] = useState('');
     const [saveOutbox, setSaveOutbox] = useState(false);
     const [ensCache, setEnsCache] = useState(new Map());
+    const [showAbout, setShowAbout] = useState(false);
 
     useEffect(() => {
         initDB();
@@ -314,6 +315,10 @@ function App() {
                     </h1>
                 </div>
                 <div className="header-right">
+                    <div className="header-links">
+                        <button className="header-link" onClick={() => setShowAbout(true)}>About</button>
+                        <a className="header-link" href="https://github.com/jefdiesel/chainmail" target="_blank" rel="noopener noreferrer">GitHub</a>
+                    </div>
                     <ConnectButton />
                 </div>
             </header>
@@ -439,8 +444,31 @@ function App() {
                     </div>
                 </div>
             )}
+            {showAbout && (
+                <div className="modal" role="dialog" aria-modal="true">
+                    <div className="modal-content">
+                        <div className="close-modal" onClick={() => setShowAbout(false)}>✕</div>
+                        <div className="notification-icon">⛓️</div>
+                        <h2>About Chainmail</h2>
+                        <p style={{color: '#ccc', marginBottom: '12px'}}>
+                            Chainmail is a decentralized, end-to-end encrypted messaging app that stores encrypted messages on-chain using ethscriptions.
+                        </p>
+                        <p style={{color: '#aaa'}}>
+                            Messages are encrypted using deterministic ECDH-derived keys and AES-256-GCM. Subjects and message bodies are encrypted together.
+                        </p>
+                        <p style={{color: '#aaa', marginTop: '18px'}}>
+                            Source: <a href="https://github.com/jefdiesel/chainmail" target="_blank" rel="noopener noreferrer">github.com/jefdiesel/chainmail</a>
+                        </p>
+                        <div style={{marginTop: '20px'}}>
+                            <button className="btn btn-primary" onClick={() => setShowAbout(false)}>Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 export default App;
+
+// Note: About modal UI is inserted into the app render when `showAbout` is true.

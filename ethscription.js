@@ -211,6 +211,12 @@ async function fetchMessagesFromBlockchainDirect(address) {
         console.log('Fetching recent transactions for', address);
         
         const apiKey = import.meta.env.VITE_ALCHEMY_API_KEY;
+        
+        if (!apiKey) {
+            console.warn('Alchemy API key not configured, skipping blockchain scan');
+            return [];
+        }
+        
         const alchemyUrl = `https://eth-mainnet.g.alchemy.com/v2/${apiKey}`;
         
         // Get current block
