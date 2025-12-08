@@ -28,10 +28,12 @@ export function deriveKeypairFromAddress(address) {
  * Encrypt a message for a recipient using ECDH
  * @param {string} recipientAddress - Recipient's Ethereum address
  * @param {string} message - Plain text message to encrypt
- * @param {object} provider - Ethers provider
+ * @param {string} subject - Subject line (optional)
+ * @param {string} senderAddress - Sender's address
+ * @param {boolean} saveOutbox - Whether to save to outbox
  * @returns {object} Encrypted message data
  */
-export async function encryptMessageForRecipient(message, recipientAddress, senderAddress, saveOutbox = false) {
+export async function encryptMessageForRecipient(message, recipientAddress, senderAddress, saveOutbox = false, subject = '') {
     try {
         let senderPublicKey;
         let senderPrivateKey;
@@ -54,12 +56,16 @@ export async function encryptMessageForRecipient(message, recipientAddress, send
         // Compute shared secret using sender private + recipient public
         const sharedSecret = await deriveSharedSecret(senderPrivateKey, recipientPublicKey);
         
-        // Encrypt message
-        const { ivHex, ciphertextHex } = await encryptAES(message, sharedSecret);
+        // Package subject and message together
+        const payload = JSON.stringify({ subject: subject || '', message });
         
-        // Package with sender's public key
+        // Encrypt the entire payload
+        const { ivHex, ciphertextHex } = await encryptAES(payload, sharedSecret);
+        
+        // Package with sender's public key and sender address (for ephemeral messages)
         const encrypted = { 
-            senderPublicKey, 
+            senderPublicKey,
+            senderAddress: saveOutbox ? senderAddress : undefined, // Only include if not ephemeral
             iv: ivHex, 
             ciphertext: ciphertextHex,
             saveOutbox // Include flag for reference
@@ -78,19 +84,77 @@ export async function encryptMessageForRecipient(message, recipientAddress, send
 /**
  * Decrypt a message using the recipient's private key
  * @param {string} privateKey - Recipient's private key (from wallet)
- * @param {string} calldata - Encrypted calldata from transaction
- * @returns {string} Decrypted message
+ * @param {string} encryptedData - Encrypted calldata from transaction
+ * @returns {object} Decrypted message object with subject and message, or null
  */
 export async function decryptMessage(privateKey, encryptedData) {
     try {
-        const encryptedStr = atob(encryptedData);
-        const parsed = JSON.parse(encryptedStr);
-        const { senderPublicKey, iv, ciphertext } = parsed;
+        // Validate encryptedData is base64
+        if (!encryptedData || typeof encryptedData !== 'string') {
+            console.error('Invalid encrypted data: not a string');
+            return null;
+        }
+        
+        // Check if it looks like hex data (old format) instead of base64
+        if (encryptedData.startsWith('0x')) {
+            console.warn('Message appears to use old hex format, cannot decrypt');
+            return null;
+        }
+        
+        // Try to decode base64
+        let encryptedStr;
+        try {
+            encryptedStr = atob(encryptedData);
+        } catch (e) {
+            console.error('Failed to decode base64:', e);
+            return null;
+        }
+        
+        // Parse JSON
+        let parsed;
+        try {
+            parsed = JSON.parse(encryptedStr);
+        } catch (e) {
+            console.error('Failed to parse JSON from decoded data:', e);
+            return null;
+        }
+        
+        const { senderPublicKey, senderAddress, iv, ciphertext } = parsed;
+        
+        // Validate required fields
+        if (!senderPublicKey || !iv || !ciphertext) {
+            console.error('Missing required fields in encrypted data:', { 
+                hasSenderPublicKey: !!senderPublicKey, 
+                hasIv: !!iv, 
+                hasCiphertext: !!ciphertext 
+            });
+            return null;
+        }
         
         // Compute shared secret using recipient private + sender public
         const sharedSecret = await deriveSharedSecret(privateKey, senderPublicKey);
         const decrypted = await decryptAES(ciphertext, sharedSecret, iv);
-        return decrypted;
+        
+        // Try to parse as JSON (new format with subject)
+        try {
+            const payload = JSON.parse(decrypted);
+            if (payload.message !== undefined) {
+                return {
+                    subject: payload.subject || '',
+                    message: payload.message,
+                    senderAddress: senderAddress // May be undefined for ephemeral messages
+                };
+            }
+        } catch (e) {
+            // Not JSON, treat as plain text (old format)
+        }
+        
+        // Old format: plain text message
+        return {
+            subject: '',
+            message: decrypted,
+            senderAddress: senderAddress
+        };
     } catch (error) {
         console.error('Error decrypting message:', error);
         return null;

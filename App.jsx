@@ -28,6 +28,7 @@ function App() {
     const { data: walletClient } = useWalletClient();
     
     const [recipientAddress, setRecipientAddress] = useState('');
+    const [subjectText, setSubjectText] = useState('');
     const [messageText, setMessageText] = useState('');
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -69,7 +70,7 @@ function App() {
                     to: msg.to_address || msg.initial_owner || msg.current_owner,
                     timestamp: msg.block_timestamp || msg.creation_timestamp || Date.now() / 1000,
                     blockNumber: msg.block_number,
-                    calldata: msg.content_uri,
+                    calldata: msg.calldata || msg.content_uri, // Use hex calldata, fallback to content_uri
                     decrypted: null
                 }));
                 
@@ -101,12 +102,13 @@ function App() {
             const provider = new BrowserProvider(walletClient);
             const signer = await provider.getSigner();
 
-            // Encrypt message
+            // Encrypt message with subject
             const encryptedData = await encryptMessageForRecipient(
                 messageText,
                 recipientAddress,
                 address,
-                saveOutbox
+                saveOutbox,
+                subjectText
             );
 
             setSendStatus('Sending transaction...');
@@ -125,6 +127,7 @@ function App() {
             
             // Clear form
             setRecipientAddress('');
+            setSubjectText('');
             setMessageText('');
 
         } catch (error) {
@@ -132,6 +135,19 @@ function App() {
             setSendStatus('❌ Error: ' + error.message);
             showToast('Failed to send message', 'error');
         }
+    };
+
+    const handleReply = (msg) => {
+        setRecipientAddress(msg.senderAddress || msg.from);
+        const replySubject = msg.subject 
+            ? (msg.subject.startsWith('Re: ') ? msg.subject : `Re: ${msg.subject}`)
+            : 'Re: Your message';
+        setSubjectText(replySubject);
+        
+        // Scroll to form
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        
+        showToast('Reply form populated', 'success');
     };
 
     const decryptMessages = async () => {
@@ -151,43 +167,78 @@ function App() {
                     if (msg.decrypted) return msg;
 
                     try {
-                        const encryptedData = parseCalldata(msg.calldata);
-                        if (encryptedData) {
-                            const decryptedText = await decryptMessage(privateKey, encryptedData);
-                            const updatedMsg = { ...msg, decrypted: decryptedText };
+                        // Try calldata first, fallback to content_uri
+                        const dataSource = msg.calldata || msg.content_uri;
+                        if (!dataSource) {
+                            return { ...msg, decrypted: '[No data available]' };
+                        }
+                        
+                        const encryptedData = parseCalldata(dataSource);
+                        if (!encryptedData) {
+                            return { ...msg, decrypted: '[Invalid message format]' };
+                        }
+                        
+                        // Check if it's old hex format
+                        if (encryptedData.startsWith('0x')) {
+                            return { ...msg, decrypted: '[Old format - cannot decrypt]' };
+                        }
+                        
+                        const decryptedData = await decryptMessage(privateKey, encryptedData);
+                        if (decryptedData) {
+                            const updatedMsg = { 
+                                ...msg, 
+                                subject: decryptedData.subject,
+                                decrypted: decryptedData.message,
+                                senderAddress: decryptedData.senderAddress || msg.from
+                            };
                             await storeMessage(updatedMsg);
                             return updatedMsg;
+                        } else {
+                            return { ...msg, decrypted: '[Decryption failed]' };
                         }
                     } catch (error) {
-                        console.error('Error decrypting:', error);
-                        return { ...msg, decrypted: '[Unable to decrypt]' };
+                        console.error('Error decrypting TX:', msg.transaction_hash, error);
+                        return { ...msg, decrypted: '[Error]' };
                     }
-                    return msg;
                 })
             );
 
-            setMessages(decryptedMessages);
+            // Only update if there are actual changes (new decryptions)
+            const hasNewDecryptions = decryptedMessages.some((msg, idx) => 
+                msg.decrypted !== messages[idx]?.decrypted
+            );
+            
+            if (hasNewDecryptions) {
+                setMessages(decryptedMessages);
+            }
         } catch (error) {
             console.error('Error decrypting messages:', error);
         }
     };
 
     useEffect(() => {
-        if (messages.length > 0 && walletClient) {
+        // Only decrypt if there are undecrypted messages
+        const hasUndecrypted = messages.some(msg => 
+            !msg.decrypted && msg.blockNumber >= 23969000
+        );
+        
+        if (hasUndecrypted && walletClient) {
             decryptMessages();
         }
     }, [messages.length, walletClient]);
 
     return (
         <div className="container">
-            <header>
-                <h1>📬 SecureChat</h1>
-                <p className="subtitle">End-to-end encrypted on-chain messaging</p>
+            <header className="app-header">
+                <div className="header-left">
+                    <h1 className="logo">
+                        <span className="logo-chain">Chain</span><span className="logo-mail">mail</span>
+                    </h1>
+                </div>
+                <div className="header-right">
+                    <ConnectButton />
+                </div>
             </header>
-
-            <div className="section" style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
-                <ConnectButton />
-            </div>
 
             {isConnected && (
                 <div>
@@ -208,6 +259,17 @@ function App() {
                                 />
                             </div>
                             <div className="form-group">
+                                <label htmlFor="subject-text">Subject: (optional, encrypted)</label>
+                                <input 
+                                    type="text" 
+                                    id="subject-text" 
+                                    placeholder="Message subject..."
+                                    value={subjectText}
+                                    onChange={(e) => setSubjectText(e.target.value)}
+                                    maxLength="100"
+                                />
+                            </div>
+                            <div className="form-group">
                                 <label htmlFor="message-text">Message:</label>
                                 <textarea 
                                     id="message-text" 
@@ -218,14 +280,17 @@ function App() {
                                     required
                                 />
                             </div>
-                            <div className="form-group">
-                                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                            <div className="checkbox-group">
+                                <label className="checkbox-label">
                                     <input 
                                         type="checkbox" 
                                         checked={saveOutbox}
                                         onChange={(e) => setSaveOutbox(e.target.checked)}
                                     />
-                                    <span style={{ fontSize: '14px' }}>Save copy in outbox (allows you to decrypt later, no forward secrecy)</span>
+                                    <span className="checkbox-text">
+                                        <strong>Save to Outbox</strong>
+                                        <small>Keep a copy you can decrypt later (disables forward secrecy)</small>
+                                    </span>
                                 </label>
                             </div>
                             <button type="submit" className="btn btn-primary">
@@ -254,23 +319,40 @@ function App() {
                                     <div key={msg.txHash} className="message-item">
                                         <div className="message-header">
                                             <span className="message-from">
-                                                From: {msg.from.slice(0, 6)}...{msg.from.slice(-4)}
+                                                From: {(msg.senderAddress || msg.from).slice(0, 6)}...{(msg.senderAddress || msg.from).slice(-4)}
+                                                {!msg.senderAddress && msg.decrypted && !msg.decrypted.startsWith('[') && (
+                                                    <span className="ephemeral-badge" title="Ephemeral message - sender cannot decrypt">🔒</span>
+                                                )}
                                             </span>
                                             <span className="message-time">
                                                 {new Date(msg.timestamp * 1000).toLocaleString()}
                                             </span>
                                         </div>
+                                        {msg.subject && (
+                                            <div className="message-subject">
+                                                <strong>Subject:</strong> {msg.subject}
+                                            </div>
+                                        )}
                                         <div className="message-content">
                                             {msg.decrypted || '[Decrypting...]'}
                                         </div>
-                                        <div className="message-tx">
+                                        <div className="message-footer">
                                             <a 
                                                 href={`https://etherscan.io/tx/${msg.txHash}`} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
+                                                className="message-tx-link"
                                             >
                                                 View TX: {msg.txHash.slice(0, 10)}...
                                             </a>
+                                            {msg.decrypted && !msg.decrypted.startsWith('[') && (
+                                                <button 
+                                                    onClick={() => handleReply(msg)}
+                                                    className="btn-reply"
+                                                >
+                                                    ↩️ Reply
+                                                </button>
+                                            )}
                                         </div>
                                     </div>
                                 ))

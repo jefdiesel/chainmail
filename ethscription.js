@@ -294,19 +294,13 @@ async function fetchMessagesFromBlockchainDirect(address) {
             
             if (!tx || !tx.input || tx.input === '0x') continue;
             
-            console.log('Checking TX:', txHash, 'input length:', tx.input.length);
-            
             try {
                 const dataStr = ethers.toUtf8String(tx.input);
-                console.log('Decoded preview:', dataStr.substring(0, 100));
                 
-                // Check if it's a secrechat message (exclude notifications)
-                const isNotification = dataStr.includes('"op":"notify"');
-                const isOldFormat = dataStr.includes('"p":"secrechat"') && dataStr.includes('"op":"msg"');
-                const isNewFormat = dataStr.includes('data:text/html') && dataStr.includes('id="encrypted"') && dataStr.includes('"p":"secrechat"');
+                // Only include chainfeed.online protocol messages (ignore notifications and old secrechat)
+                const isChainfeed = dataStr.includes('"p":"chainfeed.online"') && dataStr.includes('"op":"msg"');
                 
-                if (!isNotification && (isOldFormat || isNewFormat)) {
-                    console.log('✓ Found secrechat message:', txHash);
+                if (isChainfeed) {
                     messages.push({
                         transaction_hash: txHash,
                         from_address: tx.from,
@@ -322,7 +316,7 @@ async function fetchMessagesFromBlockchainDirect(address) {
             }
         }
         
-        console.log(`Found ${messages.length} secrechat messages`);
+        console.log(`Found ${messages.length} chainfeed.online messages`);
         return messages;
         
     } catch (error) {
@@ -358,7 +352,7 @@ async function fetchMessagesFromBlockchain(address) {
                     if (tx.to?.toLowerCase() === address.toLowerCase() && tx.data && tx.data !== '0x') {
                         try {
                             const dataStr = ethers.toUtf8String(tx.data);
-                            if (dataStr.includes('"p":"secrechat"') && dataStr.includes('"op":"msg"')) {
+                            if (dataStr.includes('"p":"chainfeed.online"') && dataStr.includes('"op":"msg"')) {
                                 messages.push({
                                     transaction_hash: tx.hash,
                                     from_address: tx.from,
@@ -442,16 +436,16 @@ export function parseCalldata(calldata) {
             }
         }
         
-        // Fallback to old format
+        // Only support chainfeed.online protocol
         const protocolMarker = MESSAGE_PROTOCOL;
         const startIdx = dataStr.indexOf(protocolMarker);
         
         if (startIdx === -1) {
-            throw new Error('Protocol marker not found');
+            console.warn('Protocol marker not found in calldata');
+            return null;
         }
         
         const encryptedData = dataStr.substring(startIdx + protocolMarker.length);
-        
         return encryptedData;
 
     } catch (error) {
