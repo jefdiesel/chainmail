@@ -114,66 +114,61 @@ export async function fetchMessagesForAddress(address) {
         try {
             console.log(`Fetching messages for ${address}...`);
             
-            // Query for messages sent BY this address (since v2.0 uses self-send)
-            // AND messages sent TO this address (for backwards compatibility with old messages)
-            const urls = [
-                `${ETHSCRIPTION_ENDPOINT}?creator=${address.toLowerCase()}&sort_order=desc&per_page=100`,
-                `${ETHSCRIPTION_ENDPOINT}?current_owner=${address.toLowerCase()}&sort_order=desc&per_page=100`,
-                `${ETHSCRIPTION_ENDPOINT}?initial_owner=${address.toLowerCase()}&sort_order=desc&per_page=100`
-            ];
+            // Query ALL text/plain ethscriptions (includes chainfeed.online messages)
+            // We'll filter for chainfeed.online client-side
+            const url = `https://api.ethscriptions.com/api/ethscriptions?mimetype=text/plain&sort_order=desc&per_page=500`;
             
-            let allEthscriptions = [];
+            console.log(`Querying: ${url}`);
+            const response = await fetch(url);
             
-            for (const url of urls) {
-                try {
-                    console.log(`Querying: ${url}`);
-                    const response = await fetch(url);
-                    
-                    if (response.ok) {
-                        const data = await response.json();
-                        const ethscriptions = data.ethscriptions || [];
-                        console.log(`Found ${ethscriptions.length} ethscriptions from this query`);
-                        allEthscriptions = allEthscriptions.concat(ethscriptions);
-                    }
-                } catch (e) {
-                    console.warn('Query failed:', e);
-                }
+            if (!response.ok) {
+                throw new Error(`API returned ${response.status}`);
             }
             
+            const data = await response.json();
+            // API returns array directly, not {ethscriptions: []}
+            const allEthscriptions = Array.isArray(data) ? data : (data.ethscriptions || []);
             console.log(`Found ${allEthscriptions.length} total ethscriptions`);
             
-            // Remove duplicates
-            const unique = Array.from(new Map(allEthscriptions.map(e => [e.transaction_hash, e])).values());
-            console.log(`After deduplication: ${unique.length} ethscriptions`);
-            
-            // Filter for chainfeed.online messages where this address is sender OR recipient
-            const messages = unique.filter(ethscription => {
+            // Client-side filter: only chainfeed.online messages addressed to this user
+            const messages = allEthscriptions.filter(ethscription => {
                 try {
                     const content = ethscription.content_uri || '';
                     
-                    // Check for chainfeed.online protocol
-                    const isChainfeed = content.includes('"p":"chainfeed.online"') && content.includes('"op":"msg"');
+                    // Must be chainfeed.online protocol (not old secrechat)
+                    if (!content.includes('"p":"chainfeed.online"') || !content.includes('"op":"msg"')) {
+                        return false;
+                    }
                     
-                    if (isChainfeed) {
-                        // Parse the calldata to check if this address is recipient
-                        try {
-                            const parsed = parseCalldata(content);
-                            if (parsed) {
-                                const encryptedData = JSON.parse(atob(parsed));
-                                // Message is for me if: I'm the recipient in payload OR (old format) I'm the 'to' address
-                                const isRecipient = encryptedData.to?.toLowerCase() === address.toLowerCase();
-                                const isSender = ethscription.creator?.toLowerCase() === address.toLowerCase();
-                                
-                                if (isRecipient || isSender) {
-                                    console.log('✓ Found chainfeed message:', ethscription.transaction_hash);
-                                    return true;
-                                }
-                            }
-                        } catch (parseError) {
-                            // If parsing fails, include it anyway (might be old format)
-                            console.log('✓ Found chainfeed message (parse failed, including):', ethscription.transaction_hash);
+                    // Skip old secrechat messages
+                    if (content.includes('"p":"secrechat"')) {
+                        return false;
+                    }
+                    
+                    // Parse the payload to check recipient
+                    try {
+                        // Split by data:, to get the JSON part
+                        const jsonStr = content.split('data:,')[1];
+                        if (!jsonStr) return false;
+                        
+                        // Extract just the base64 part after the protocol marker
+                        const protocolMarker = '{"p":"chainfeed.online","op":"msg"}';
+                        const markerIdx = jsonStr.indexOf(protocolMarker);
+                        if (markerIdx === -1) return false;
+                        
+                        const base64Data = jsonStr.substring(markerIdx + protocolMarker.length);
+                        const encryptedData = JSON.parse(atob(base64Data));
+                        
+                        // Message is for me if I'm the recipient in the payload
+                        const isRecipient = encryptedData.to?.toLowerCase() === address.toLowerCase();
+                        
+                        if (isRecipient) {
+                            console.log('✓ Found message for you:', ethscription.transaction_hash);
                             return true;
                         }
+                    } catch (parseError) {
+                        // Skip messages we can't parse
+                        return false;
                     }
                     
                     return false;
@@ -182,29 +177,25 @@ export async function fetchMessagesForAddress(address) {
                 }
             });
 
-            console.log(`Found ${messages.length} secrechat messages from API`);
+            console.log(`Found ${messages.length} messages addressed to you`);
             
-            // If no messages found, try fetching using ethers.js directly from blockchain
-            if (messages.length === 0) {
-                console.log('No messages from API, scanning blockchain directly...');
-                const directMessages = await fetchMessagesFromBlockchainDirect(address);
-                
-                // Cache the result
-                apiCache.set(address, {
-                    messages: directMessages,
-                    timestamp: Date.now()
-                });
-                
-                return directMessages;
-            }
+            // Return messages with clean structure
+            const normalizedMessages = messages.map(msg => ({
+                txHash: msg.transaction_hash,
+                from: msg.creator,
+                to: msg.current_owner,
+                blockNumber: msg.block_number,
+                timestamp: new Date(msg.creation_timestamp).getTime() / 1000,
+                calldata: msg.content_uri
+            }));
             
             // Cache the result
             apiCache.set(address, {
-                messages,
+                messages: normalizedMessages,
                 timestamp: Date.now()
             });
             
-            return messages;
+            return normalizedMessages;
 
         } catch (error) {
             console.error('Error fetching messages:', error);
@@ -478,12 +469,21 @@ export function parseCalldata(calldata) {
             }
         }
         
-        // Only support chainfeed.online protocol
-        const protocolMarker = MESSAGE_PROTOCOL;
-        const startIdx = dataStr.indexOf(protocolMarker);
+        // Support both formats:
+        // 1. Full protocol: data:,{"p":"chainfeed.online","op":"msg"}base64data
+        // 2. Just the JSON: {"p":"chainfeed.online","op":"msg"}base64data
+        
+        let protocolMarker = MESSAGE_PROTOCOL;
+        let startIdx = dataStr.indexOf(protocolMarker);
+        
+        // If full protocol not found, try without the data:, prefix
+        if (startIdx === -1) {
+            protocolMarker = '{"p":"chainfeed.online","op":"msg"}';
+            startIdx = dataStr.indexOf(protocolMarker);
+        }
         
         if (startIdx === -1) {
-            console.warn('Protocol marker not found in calldata');
+            console.warn('Protocol marker not found in calldata. Data preview:', dataStr.substring(0, 100));
             return null;
         }
         
