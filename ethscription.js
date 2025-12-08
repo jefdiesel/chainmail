@@ -25,10 +25,10 @@ export function clearCache(address) {
 }
 
 /**
- * Send an encrypted message as an ethscription transaction with image
- * @param {string} recipientAddress - Recipient's Ethereum address
- * @param {string} encryptedCalldata - Encrypted message calldata
- * @param {string} senderAddress - Sender's address for image generation
+ * Send an encrypted message as an ethscription transaction
+ * @param {string} recipientAddress - Recipient's Ethereum address (stored in calldata)
+ * @param {string} encryptedCalldata - Encrypted message calldata with recipient info
+ * @param {string} senderAddress - Sender's address (transaction sent to self)
  * @param {object} provider - Ethers provider
  * @param {object} signer - Ethers signer
  * @returns {object} Transaction details
@@ -46,9 +46,10 @@ export async function sendEncryptedMessage(recipientAddress, encryptedCalldata, 
         // Convert to hex for calldata
         const calldataHex = ethers.hexlify(ethers.toUtf8Bytes(calldataString));
 
-        // Build transaction
+        // Build transaction - SELF-SEND for privacy
+        // Recipient address is in the calldata, not in 'to' field
         const tx = {
-            to: recipientAddress,
+            to: senderAddress, // Send to self - keeps wallet history clean
             value: 0,
             data: calldataHex
         };
@@ -113,8 +114,10 @@ export async function fetchMessagesForAddress(address) {
         try {
             console.log(`Fetching messages for ${address}...`);
             
-            // Try both current_owner and initial_owner
+            // Query for messages sent BY this address (since v2.0 uses self-send)
+            // AND messages sent TO this address (for backwards compatibility with old messages)
             const urls = [
+                `${ETHSCRIPTION_ENDPOINT}?creator=${address.toLowerCase()}&sort_order=desc&per_page=100`,
                 `${ETHSCRIPTION_ENDPOINT}?current_owner=${address.toLowerCase()}&sort_order=desc&per_page=100`,
                 `${ETHSCRIPTION_ENDPOINT}?initial_owner=${address.toLowerCase()}&sort_order=desc&per_page=100`
             ];
@@ -143,20 +146,37 @@ export async function fetchMessagesForAddress(address) {
             const unique = Array.from(new Map(allEthscriptions.map(e => [e.transaction_hash, e])).values());
             console.log(`After deduplication: ${unique.length} ethscriptions`);
             
-            // Filter for secrechat messages (both old and new HTML format)
+            // Filter for chainfeed.online messages where this address is sender OR recipient
             const messages = unique.filter(ethscription => {
                 try {
                     const content = ethscription.content_uri || '';
                     
-                    // Check for old format or new HTML format
-                    const isOldFormat = content.includes('"p":"secrechat"') && content.includes('"op":"msg"');
-                    const isNewFormat = content.includes('data:text/html') && content.includes('id="encrypted"') && content.includes('"p":"secrechat"');
+                    // Check for chainfeed.online protocol
+                    const isChainfeed = content.includes('"p":"chainfeed.online"') && content.includes('"op":"msg"');
                     
-                    if (isOldFormat || isNewFormat) {
-                        console.log('✓ Found secrechat message:', ethscription.transaction_hash);
+                    if (isChainfeed) {
+                        // Parse the calldata to check if this address is recipient
+                        try {
+                            const parsed = parseCalldata(content);
+                            if (parsed) {
+                                const encryptedData = JSON.parse(atob(parsed));
+                                // Message is for me if: I'm the recipient in payload OR (old format) I'm the 'to' address
+                                const isRecipient = encryptedData.to?.toLowerCase() === address.toLowerCase();
+                                const isSender = ethscription.creator?.toLowerCase() === address.toLowerCase();
+                                
+                                if (isRecipient || isSender) {
+                                    console.log('✓ Found chainfeed message:', ethscription.transaction_hash);
+                                    return true;
+                                }
+                            }
+                        } catch (parseError) {
+                            // If parsing fails, include it anyway (might be old format)
+                            console.log('✓ Found chainfeed message (parse failed, including):', ethscription.transaction_hash);
+                            return true;
+                        }
                     }
                     
-                    return isOldFormat || isNewFormat;
+                    return false;
                 } catch (e) {
                     return false;
                 }
@@ -303,19 +323,35 @@ async function fetchMessagesFromBlockchainDirect(address) {
             try {
                 const dataStr = ethers.toUtf8String(tx.input);
                 
-                // Only include chainfeed.online protocol messages (ignore notifications and old secrechat)
+                // Only include chainfeed.online protocol messages
                 const isChainfeed = dataStr.includes('"p":"chainfeed.online"') && dataStr.includes('"op":"msg"');
                 
                 if (isChainfeed) {
-                    messages.push({
-                        transaction_hash: txHash,
-                        from_address: tx.from,
-                        to_address: tx.to,
-                        block_number: parseInt(tx.blockNumber, 16),
-                        block_timestamp: transfer.metadata?.blockTimestamp ? new Date(transfer.metadata.blockTimestamp).getTime() / 1000 : Date.now() / 1000,
-                        content_uri: dataStr,
-                        calldata: tx.input
-                    });
+                    // Check if this message is for the queried address
+                    let isForMe = false;
+                    try {
+                        const parsed = parseCalldata(dataStr);
+                        if (parsed) {
+                            const encryptedData = JSON.parse(atob(parsed));
+                            // Message is for me if: I'm the recipient in payload
+                            isForMe = encryptedData.to?.toLowerCase() === address.toLowerCase();
+                        }
+                    } catch {
+                        // If parsing fails, include it (might be old format or sent to me)
+                        isForMe = tx.to?.toLowerCase() === address.toLowerCase();
+                    }
+                    
+                    if (isForMe) {
+                        messages.push({
+                            transaction_hash: txHash,
+                            from_address: tx.from,
+                            to_address: tx.to,
+                            block_number: parseInt(tx.blockNumber, 16),
+                            block_timestamp: transfer.metadata?.blockTimestamp ? new Date(transfer.metadata.blockTimestamp).getTime() / 1000 : Date.now() / 1000,
+                            content_uri: dataStr,
+                            calldata: tx.input
+                        });
+                    }
                 }
             } catch (e) {
                 console.warn('Error decoding TX:', txHash, e);

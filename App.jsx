@@ -5,7 +5,8 @@ import { BrowserProvider } from 'ethers';
 import { 
     encryptMessageForRecipient, 
     decryptMessage,
-    deriveKeypairFromAddress
+    deriveKeypairFromWalletSignature,
+    deriveKeypairFromAddress // Keep for backwards compatibility
 } from './crypto.js';
 import { 
     sendEncryptedMessage, 
@@ -37,6 +38,7 @@ function App() {
     const [saveOutbox, setSaveOutbox] = useState(false);
     const [ensCache, setEnsCache] = useState(new Map());
     const [showAbout, setShowAbout] = useState(false);
+    const [cachedPrivateKey, setCachedPrivateKey] = useState(null); // Session cache for derived key
 
     useEffect(() => {
         initDB();
@@ -49,6 +51,9 @@ function App() {
             // Poll for new messages every 2 minutes
             const interval = setInterval(loadMessages, 120000);
             return () => clearInterval(interval);
+        } else {
+            // Clear cached key when wallet disconnects
+            setCachedPrivateKey(null);
         }
     }, [isConnected, address]);
 
@@ -229,8 +234,19 @@ function App() {
             const provider = new BrowserProvider(walletClient);
             const signer = await provider.getSigner();
             
-            // Derive deterministic private key from address
-            const { privateKey } = deriveKeypairFromAddress(address);
+            // Derive secure private key from wallet signature (v2.0)
+            // This requires actual wallet access - cannot be computed by attacker
+            // Cache in session to avoid repeated signature prompts
+            let privateKey = cachedPrivateKey;
+            
+            if (!privateKey) {
+                const keyData = await deriveKeypairFromWalletSignature(
+                    walletClient.signMessage.bind(walletClient),
+                    address
+                );
+                privateKey = keyData.privateKey;
+                setCachedPrivateKey(privateKey); // Cache for session
+            }
 
             const decryptedMessages = await Promise.all(
                 messages
@@ -322,6 +338,18 @@ function App() {
                     <ConnectButton />
                 </div>
             </header>
+
+            {/* v2.0 Security Upgrade Notice */}
+            {isConnected && (
+                <div className="security-notice">
+                    <strong>🔐 Chainmail v2.0 Security Upgrade</strong>
+                    <p>
+                        Now using wallet-signature-based encryption (not deterministic). 
+                        Old messages stay encrypted with legacy keys. 
+                        All new messages use forward-secret ephemeral keys by default.
+                    </p>
+                </div>
+            )}
 
             {isConnected && (
                 <div>

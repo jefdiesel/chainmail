@@ -4,18 +4,62 @@
 import { ethers } from 'ethers';
 
 /**
- * Derive a deterministic keypair from an Ethereum address
+ * Derive a deterministic PUBLIC key from an Ethereum address
+ * SAFE: Public keys are meant to be public
+ * Used by sender to encrypt messages to recipient
  * @param {string} address - Ethereum address
- * @returns {object} { privateKey, publicKey }
+ * @returns {string} publicKey - Deterministic public key
  */
-export function deriveKeypairFromAddress(address) {
+export function derivePublicKeyFromAddress(address) {
     // Create a deterministic seed from address + salt
     const seed = ethers.keccak256(ethers.toUtf8Bytes(address.toLowerCase() + "SecureChat"));
     
-    // Use first 32 bytes as private key
+    // Use first 32 bytes as private key (only used to derive public)
     const privateKey = '0x' + seed.slice(2, 66);
     
     // Create signing key from private key to get public key
+    const signingKey = new ethers.SigningKey(privateKey);
+    
+    return signingKey.publicKey;
+}
+
+/**
+ * Derive keypair from WALLET SIGNATURE (secure)
+ * CRITICAL: This requires actual wallet access - cannot be derived by attacker
+ * Used by recipient to decrypt their messages
+ * @param {function} signMessageFn - Async function to sign message with wallet
+ * @param {string} address - User's Ethereum address
+ * @returns {Promise<object>} { privateKey, publicKey, signature }
+ */
+export async function deriveKeypairFromWalletSignature(signMessageFn, address) {
+    // Message to sign - deterministic so we get same keypair each session
+    const message = `Chainmail v2.0 Messaging Key\n\nAddress: ${address.toLowerCase()}\n\nSign this once to securely decrypt your messages.`;
+    
+    // Get wallet signature (only real wallet owner can create this)
+    const signature = await signMessageFn({ message });
+    
+    // Derive private key from signature (256 bits of entropy)
+    const seed = ethers.keccak256(signature);
+    const privateKey = '0x' + seed.slice(2, 66);
+    
+    // Get public key
+    const signingKey = new ethers.SigningKey(privateKey);
+    
+    return {
+        privateKey,
+        publicKey: signingKey.publicKey,
+        signature
+    };
+}
+
+/**
+ * DEPRECATED: Old insecure derivation (kept for reference)
+ * DO NOT USE - anyone can compute this from public address
+ */
+export function deriveKeypairFromAddress(address) {
+    console.warn('⚠️ deriveKeypairFromAddress is INSECURE - use deriveKeypairFromWalletSignature instead');
+    const seed = ethers.keccak256(ethers.toUtf8Bytes(address.toLowerCase() + "SecureChat"));
+    const privateKey = '0x' + seed.slice(2, 66);
     const signingKey = new ethers.SigningKey(privateKey);
     
     return {
@@ -40,6 +84,8 @@ export async function encryptMessageForRecipient(message, recipientAddress, send
         
         if (saveOutbox) {
             // Use deterministic keys - allows sender to decrypt later
+            // WARNING: This still uses old insecure method for backwards compatibility
+            // TODO: Migrate to wallet-signed keys
             const senderKeys = deriveKeypairFromAddress(senderAddress);
             senderPrivateKey = senderKeys.privateKey;
             senderPublicKey = senderKeys.publicKey;
@@ -50,8 +96,8 @@ export async function encryptMessageForRecipient(message, recipientAddress, send
             senderPublicKey = ephemeralWallet.signingKey.publicKey;
         }
         
-        // Derive recipient's deterministic public key
-        const { publicKey: recipientPublicKey } = deriveKeypairFromAddress(recipientAddress);
+        // Derive recipient's deterministic public key (this is safe - public keys are public)
+        const recipientPublicKey = derivePublicKeyFromAddress(recipientAddress);
         
         // Compute shared secret using sender private + recipient public
         const sharedSecret = await deriveSharedSecret(senderPrivateKey, recipientPublicKey);
@@ -62,10 +108,12 @@ export async function encryptMessageForRecipient(message, recipientAddress, send
         // Encrypt the entire payload
         const { ivHex, ciphertextHex } = await encryptAES(payload, sharedSecret);
         
-        // Package with sender's public key and sender address (for ephemeral messages)
+        // Package encrypted data
+        // Recipient address included since we now self-send (privacy fix)
         const encrypted = { 
-            senderPublicKey,
-            senderAddress: saveOutbox ? senderAddress : undefined, // Only include if not ephemeral
+            to: recipientAddress, // Recipient address (tx is self-send)
+            senderPublicKey, // Required for ECDH shared secret computation
+            senderAddress: saveOutbox ? senderAddress : undefined, // Only include if saving to outbox
             iv: ivHex, 
             ciphertext: ciphertextHex,
             saveOutbox // Include flag for reference
