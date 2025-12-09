@@ -62,6 +62,7 @@ function App() {
     const [prekeyStatus, setPrekeyStatus] = useState('');
     const [showSecurityWarning, setShowSecurityWarning] = useState(false);
     const [pendingSendData, setPendingSendData] = useState(null);
+    const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
     // Backup/Restore state
     const [showBackupModal, setShowBackupModal] = useState(false);
@@ -557,11 +558,21 @@ function App() {
                         <span className="logo-emoji">⛓️</span>
                         <span className="logo-chain">Chain</span><span className="logo-mail">mail</span>
                     </h1>
-                    <div className="header-links">
-                        <button className="header-link" onClick={() => setCurrentPage('about')}>Get Started</button>
+                    <button
+                        className="hamburger-menu"
+                        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                        aria-label="Toggle menu"
+                    >
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </button>
+                    <div className={`header-links ${mobileMenuOpen ? 'mobile-open' : ''}`}>
+                        <button className="header-link" onClick={() => { setCurrentPage('about'); setMobileMenuOpen(false); }}>Get Started</button>
                         <a className="header-link" href="https://github.com/jefdiesel/chainmail" target="_blank" rel="noopener noreferrer">GitHub</a>
-                        <button onClick={handleExportBackup} className="header-link">Backup</button>
-                        <button onClick={() => setShowRestoreModal(true)} className="header-link">Restore</button>
+                        <button onClick={() => { handleExportBackup(); setMobileMenuOpen(false); }} className="header-link">Backup</button>
+                        <button onClick={() => { setShowRestoreModal(true); setMobileMenuOpen(false); }} className="header-link">Restore</button>
+                        <a className="header-link" href="https://chainfeed.online" target="_blank" rel="noopener noreferrer">Ethscriptions</a>
                         {isConnected && hasPrekeys && (
                             <span className="header-status-check" title="Prekey setup ready">✓</span>
                         )}
