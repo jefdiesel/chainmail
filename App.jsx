@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useWalletClient } from 'wagmi';
 import { BrowserProvider } from 'ethers';
@@ -73,6 +73,9 @@ function App() {
     const [restoreMnemonic, setRestoreMnemonic] = useState('');
     const [restoreFile, setRestoreFile] = useState(null);
     const [backupStatus, setBackupStatus] = useState('');
+
+    // Ref to track if we just loaded messages from cache (prevents immediate re-decryption)
+    const justLoadedFromCache = useRef(false);
 
     useEffect(() => {
         initDB();
@@ -244,10 +247,12 @@ function App() {
 
             // Get cached decrypted messages from IndexedDB
             const cachedMessages = await getCachedMessages(address);
+            console.log(`📦 Loaded ${cachedMessages.length} cached messages from IndexedDB`);
             const cachedMap = new Map(cachedMessages.map(msg => [msg.txHash, msg]));
 
             // Fetch fresh messages from blockchain
             const freshMessages = await fetchMessagesForAddress(address);
+            console.log(`⛓️ Fetched ${freshMessages.length} messages from blockchain`);
 
             // Merge: use cached decrypted content if available, otherwise use fresh message
             const mergedMessages = freshMessages.map(freshMsg => {
@@ -260,6 +265,11 @@ function App() {
                 return freshMsg;
             });
 
+            const alreadyDecrypted = mergedMessages.filter(m => m.decrypted).length;
+            console.log(`🔀 Merged ${mergedMessages.length} messages (${alreadyDecrypted} from cache, ${mergedMessages.length - alreadyDecrypted} need decryption)`);
+
+            // Set flag to prevent immediate decryption after loading from cache
+            justLoadedFromCache.current = true;
             setMessages(mergedMessages);
         } catch (error) {
             console.error('Error loading messages:', error);
@@ -448,10 +458,13 @@ function App() {
     const decryptMessages = async () => {
         if (!walletClient || messages.length === 0) return;
 
+        const alreadyDecrypted = messages.filter(m => m.decrypted).length;
+        console.log(`🔓 decryptMessages() called: ${messages.length} total, ${alreadyDecrypted} already decrypted`);
+
         try {
             const provider = new BrowserProvider(walletClient);
             const signer = await provider.getSigner();
-            
+
             // For now, use deterministic key derivation (matches encryption)
             // TODO: Implement proper key exchange for wallet-signature keys
             const { privateKey } = deriveKeypairFromAddress(address);
@@ -532,10 +545,25 @@ function App() {
 
     useEffect(() => {
         // Only decrypt if there are undecrypted messages
-        const hasUndecrypted = messages.some(msg => 
+        const hasUndecrypted = messages.some(msg =>
             !msg.decrypted && msg.blockNumber >= 23969000
         );
-        
+
+        // If we just loaded from cache, skip immediate decryption to prevent overwriting merged data
+        if (justLoadedFromCache.current) {
+            console.log(`⏭️ Skipping immediate decryption (just loaded from cache)`);
+            justLoadedFromCache.current = false; // Reset for next time
+
+            // But schedule decryption for any truly new messages after a short delay
+            if (hasUndecrypted && walletClient) {
+                console.log(`⏰ Scheduling delayed decryption for ${messages.length - messages.filter(m => m.decrypted).length} new messages`);
+                setTimeout(() => {
+                    decryptMessages();
+                }, 500); // 500ms delay to let React state fully update
+            }
+            return;
+        }
+
         if (hasUndecrypted && walletClient) {
             decryptMessages();
         }
