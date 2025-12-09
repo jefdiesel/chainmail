@@ -520,7 +520,7 @@ function App() {
                         <span className="logo-chain">Chain</span><span className="logo-mail">mail</span>
                     </h1>
                     <div className="header-links">
-                        <button className="header-link" onClick={() => setCurrentPage('about')}>About</button>
+                        <button className="header-link" onClick={() => setCurrentPage('about')}>Get Started</button>
                         <a className="header-link" href="https://github.com/jefdiesel/chainmail" target="_blank" rel="noopener noreferrer">GitHub</a>
                         <button onClick={handleExportBackup} className="header-link">Backup</button>
                         <button onClick={() => setShowRestoreModal(true)} className="header-link">Restore</button>

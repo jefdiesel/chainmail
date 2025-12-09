@@ -8,14 +8,79 @@ function About({ onBack }) {
                     <span className="logo-emoji">⛓️</span>
                     <span className="logo-chain">Chain</span><span className="logo-mail">mail</span>
                 </h1>
-                <p className="tagline">Signal Protocol End-to-End Encrypted Messaging on Ethereum</p>
+                <p className="tagline">Get Started with Encrypted On-Chain Messaging</p>
                 <button onClick={onBack} className="btn btn-secondary" style={{marginTop: '20px'}}>
                     ← Back to App
                 </button>
             </div>
 
+            <section className="about-section" style={{backgroundColor: '#0a0a0a', border: '2px solid #CEFF00', padding: '25px'}}>
+                <h2 style={{color: '#CEFF00', marginTop: '0'}}>Free • Decentralized • Contractless</h2>
+                <p style={{fontSize: '16px', lineHeight: '1.6'}}>
+                    Chainmail is end-to-end encrypted messaging that runs entirely in your browser.
+                    No servers, no accounts, no tracking. Just connect your wallet and start messaging.
+                </p>
+                <ul style={{fontSize: '15px', lineHeight: '1.8', marginTop: '15px'}}>
+                    <li><strong>Free to use</strong> - only pay Ethereum network fees (a few cents per message)</li>
+                    <li><strong>Signal Protocol encryption</strong> - the same security used by Signal and WhatsApp</li>
+                    <li><strong>No contracts</strong> - messages stored as ethscriptions (transaction data)</li>
+                    <li><strong>Your keys, your messages</strong> - nobody can read your conversations but you</li>
+                </ul>
+            </section>
+
             <section className="about-section">
-                <h2>Chainmail v3.0</h2>
+                <h2>Quick Start</h2>
+
+                <h3>1. Connect Your Wallet</h3>
+                <p>
+                    Click "Connect Wallet" in the top right. Any Ethereum wallet works (MetaMask, Coinbase Wallet, Rainbow, etc.).
+                    Your wallet address becomes your messaging identity.
+                </p>
+
+                <h3>2. Set Up Encryption Keys (One-Time)</h3>
+                <p>
+                    Click "Publish Prekey Bundle" to set up your encryption keys. This costs a few cents in gas and
+                    only needs to be done once. These keys let others send you encrypted messages.
+                </p>
+
+                <h3>3. Send a Message</h3>
+                <p>
+                    Enter a recipient's address or ENS name (like vitalik.eth), type your message, and hit send.
+                    Your message is encrypted and stored permanently on Ethereum. Cost: ~$0.03-0.10 depending on network congestion.
+                </p>
+
+                <h3>4. Receive Messages</h3>
+                <p>
+                    Click "Inbox" to check for new messages. They'll automatically decrypt if someone sent to your address.
+                    The app checks for new messages every 2 minutes.
+                </p>
+
+                <h3>5. Backup Your Keys</h3>
+                <p>
+                    Click "Backup" to save your encryption keys with a 12-word recovery phrase. Store both the JSON file
+                    and recovery phrase safely - you'll need them to access messages on other devices.
+                </p>
+            </section>
+
+            <section className="about-section">
+                <h2>What Makes Chainmail Different?</h2>
+                <p>
+                    <strong>No servers to hack.</strong> Your messages live on Ethereum, not in some company's database.
+                </p>
+                <p>
+                    <strong>No accounts to create.</strong> Your Ethereum address is your username. No email, no phone number, no personal info.
+                </p>
+                <p>
+                    <strong>Messages can't be deleted.</strong> Once sent, they're permanent. This is by design - true censorship resistance.
+                </p>
+                <p>
+                    <strong>Military-grade encryption.</strong> Signal Protocol provides perfect forward secrecy and post-compromise security.
+                    Even if someone steals your keys today, past messages stay secure.
+                </p>
+            </section>
+
+            <section className="about-section">
+                <h2>About Chainmail v3.0</h2>
                 <p>
                     Chainmail is a browser-based encrypted messaging application that stores messages
                     on the Ethereum blockchain as ethscriptions. Messages are encrypted using the
@@ -125,7 +190,7 @@ function About({ onBack }) {
                     <li>Connect Ethereum wallet</li>
                     <li>Sign message to derive Signal Protocol identity keypair</li>
                     <li>Generate prekey bundle (identity key + signed prekeys + one-time prekeys)</li>
-                    <li>Publish prekey bundle to on-chain registry (~$1 gas cost, one-time)</li>
+                    <li>Publish prekey bundle to on-chain registry (a few cents in gas, one-time)</li>
                 </ol>
 
                 <h3>Sending Messages</h3>
@@ -201,12 +266,12 @@ function About({ onBack }) {
             <section className="about-section">
                 <h2>Limitations</h2>
                 <ul>
-                    <li><strong>Gas Costs:</strong> Each message requires Ethereum transaction (~$5-50 depending on network congestion)</li>
+                    <li><strong>Network Fees:</strong> Each message requires an Ethereum transaction (typically $0.03-0.10 depending on network congestion)</li>
                     <li><strong>Latency:</strong> Message delivery requires block confirmation (~12 seconds)</li>
                     <li><strong>Metadata Leakage:</strong> Transaction timestamps, sizes, and sender addresses are public</li>
                     <li><strong>No Deniability:</strong> Messages are cryptographically signed and non-repudiable</li>
                     <li><strong>Browser Only:</strong> No mobile apps or native clients</li>
-                    <li><strong>Mainnet Only:</strong> L2 support not yet implemented</li>
+                    <li><strong>Mainnet Only:</strong> L2 support not yet implemented (multichain coming soon)</li>
                 </ul>
             </section>
 
