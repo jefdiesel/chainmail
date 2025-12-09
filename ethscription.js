@@ -134,7 +134,12 @@ export async function fetchMessagesForAddress(address) {
             const messages = allEthscriptions.filter(ethscription => {
                 try {
                     const content = ethscription.content_uri || '';
-                    
+
+                    // Debug: log first few characters to see format
+                    if (content.includes('chainfeed') || content.includes('msg')) {
+                        console.log('Checking ethscription:', ethscription.transaction_hash?.slice(0, 10), content.slice(0, 100));
+                    }
+
                     // Must be chainfeed.online protocol (not old secrechat)
                     if (!content.includes('"p":"chainfeed.online"') || !content.includes('"op":"msg"')) {
                         return false;

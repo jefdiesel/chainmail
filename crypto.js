@@ -540,3 +540,154 @@ async function decryptAES(ciphertextHex, key, ivHex) {
 export function isValidAddress(address) {
     return ethers.isAddress(address);
 }
+
+// ============================================================================
+// Signal Protocol Integration (v3.0)
+// ============================================================================
+
+import { getSignalStore, signalEncryptMessage, signalDecryptMessage } from './signalStore.js';
+import { fetchPrekeyBundle, getAvailablePrekeys } from './prekeyRegistry.js';
+
+/**
+ * Encrypt message using Signal protocol (X3DH + Double Ratchet)
+ * @param {string} message - Plain text message
+ * @param {string} subject - Subject line
+ * @param {string} recipientAddress - Recipient's address
+ * @param {string} senderAddress - Sender's address
+ * @returns {Promise<string>} Encrypted message bundle (base64)
+ */
+export async function encryptMessageSignal(message, subject, recipientAddress, senderAddress) {
+    try {
+        // Initialize Signal store for sender
+        await getSignalStore(senderAddress);
+
+        // Fetch recipient's prekey bundle from chain
+        const recipientBundle = await fetchPrekeyBundle(recipientAddress);
+        if (!recipientBundle) {
+            // No prekeys found - fall back to v2.0 ephemeral ECDH
+            console.warn(`⚠️ Recipient ${recipientAddress} has no prekeys. Falling back to v2.0 encryption.`);
+            return await encryptMessageForRecipient(message, recipientAddress, senderAddress, false, subject);
+        }
+
+        // Check if there are available prekeys
+        const availablePrekeys = getAvailablePrekeys(recipientBundle);
+        if (availablePrekeys.length === 0) {
+            console.warn('⚠️ No available one-time prekeys, using signed prekey only');
+        }
+
+        // Package message with subject
+        const payload = JSON.stringify({ subject: subject || '', message });
+
+        // Encrypt using Signal protocol
+        const ciphertext = await signalEncryptMessage(
+            senderAddress,
+            recipientAddress,
+            recipientBundle,
+            payload
+        );
+
+        // Package for on-chain storage
+        const packagedMessage = {
+            v: 3, // Signal protocol version
+            to: recipientAddress,
+            isPreKeyMessage: ciphertext.isPreKeyMessage,
+            x3dh: ciphertext.x3dh,
+            header: ciphertext.header,
+            iv: ciphertext.iv,
+            ciphertext: ciphertext.ciphertext,
+            timestamp: Date.now()
+        };
+
+        return btoa(JSON.stringify(packagedMessage));
+
+    } catch (error) {
+        console.error('Error encrypting with Signal protocol:', error);
+        throw error;
+    }
+}
+
+/**
+ * Decrypt message using Signal protocol
+ * @param {string} encryptedData - Encrypted message (base64)
+ * @param {string} senderAddress - Sender's address
+ * @param {string} recipientAddress - Recipient's address (current user)
+ * @returns {Promise<object>} Decrypted { subject, message, senderAddress }
+ */
+export async function decryptMessageSignal(encryptedData, senderAddress, recipientAddress) {
+    try {
+        console.log('🔓 Step 1: Getting Signal store');
+        // Initialize Signal store for recipient
+        await getSignalStore(recipientAddress);
+
+        console.log('🔓 Step 2: Parsing package');
+        // Parse encrypted package
+        const decoded = atob(encryptedData);
+        const packagedMessage = JSON.parse(decoded);
+
+        // Verify version
+        if (packagedMessage.v !== 3) {
+            throw new Error(`Unsupported message version: ${packagedMessage.v}`);
+        }
+
+        console.log('🔓 Step 3: Preparing encrypted message');
+        console.log('🔓 Message DH public key:', packagedMessage.header?.dhPublicKey?.slice(0, 32) || 'N/A');
+        console.log('🔓 Is prekey message:', packagedMessage.isPreKeyMessage);
+
+        // Decrypt using Signal protocol
+        const encryptedMessage = {
+            isPreKeyMessage: packagedMessage.isPreKeyMessage,
+            x3dh: packagedMessage.x3dh,
+            header: packagedMessage.header,
+            iv: packagedMessage.iv,
+            ciphertext: packagedMessage.ciphertext
+        };
+
+        console.log('🔓 Step 4: Calling signalDecryptMessage...');
+        const decrypted = await signalDecryptMessage(recipientAddress, senderAddress, encryptedMessage);
+        console.log('🔓 Step 5: Decryption complete');
+
+        // Parse payload (subject + message)
+        const payload = JSON.parse(decrypted);
+
+        return {
+            subject: payload.subject || '',
+            message: payload.message,
+            senderAddress: senderAddress
+        };
+
+    } catch (error) {
+        console.error('Error decrypting with Signal protocol:', error);
+        return null;
+    }
+}
+
+/**
+ * Auto-detect message version and decrypt accordingly
+ * @param {string} encryptedData - Encrypted message (base64)
+ * @param {string} senderAddress - Sender's address
+ * @param {string} recipientPrivateKey - Recipient's private key (for v2)
+ * @param {string} recipientAddress - Recipient's address (for v3)
+ * @returns {Promise<object>} Decrypted message
+ */
+export async function decryptMessageAuto(encryptedData, senderAddress, recipientPrivateKey, recipientAddress) {
+    try {
+        // Try to parse as JSON
+        const decoded = atob(encryptedData);
+        const parsed = JSON.parse(decoded);
+
+        // Check version
+        if (parsed.v === 3) {
+            // Signal protocol v3.0
+            console.log('🔐 Decrypting v3.0 Signal protocol message');
+            return await decryptMessageSignal(encryptedData, senderAddress, recipientAddress);
+        } else {
+            // Legacy ECDH v2.0 (no version field or different version)
+            console.log('🔐 Decrypting v2.0 legacy ECDH message');
+            return await decryptMessage(recipientPrivateKey, encryptedData);
+        }
+    } catch (e) {
+        console.warn('Error parsing message, trying legacy decrypt:', e.message);
+        // Fallback to legacy
+        return await decryptMessage(recipientPrivateKey, encryptedData);
+    }
+}
