@@ -515,6 +515,7 @@ function App() {
                         <button className="header-link" onClick={() => setCurrentPage('about')}>About</button>
                         <a className="header-link" href="https://github.com/jefdiesel/chainmail" target="_blank" rel="noopener noreferrer">GitHub</a>
                         <button onClick={handleExportBackup} className="header-link">Backup</button>
+                        <button onClick={() => setShowRestoreModal(true)} className="header-link">Restore</button>
                         {isConnected && hasPrekeys && (
                             <span className="header-status-check" title="Prekey setup ready">✓</span>
                         )}
