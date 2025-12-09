@@ -263,11 +263,13 @@ Prekeys are public cryptographic keys that let others send you fully encrypted m
 3. **Sign the transaction** - Costs about $0.03-0.10 in gas (one-time)
 4. **Done!** - You'll see a green ✓ checkmark when ready
 
-**After setup:**
-- Your pending message will automatically decrypt
-- Others can send you messages with full Signal Protocol encryption
-- You can respond with forward secrecy enabled
-- The green checkmark shows you're ready to receive messages
+**What happens after setup:**
+- Future senders can use full Signal Protocol with forward secrecy
+- You can respond to messages with Signal Protocol encryption
+- The green checkmark shows you're ready
+- Others know you're set up for secure messaging
+
+**Note:** If someone already sent you a message before you published prekeys, it was encrypted with fallback encryption (v2.0). You can already read it once you connect your wallet - publishing prekeys only enables Signal Protocol for new messages going forward.
 
 **Why the cost?**
 The $0.03 gas fee publishes your prekeys to the Ethereum blockchain (as an ethscription). This is a one-time cost that makes you discoverable for encrypted messaging without any central server. True decentralization has a small price tag.
