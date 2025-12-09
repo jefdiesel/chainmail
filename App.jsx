@@ -64,6 +64,8 @@ function App() {
     const [showBackupModal, setShowBackupModal] = useState(false);
     const [showRestoreModal, setShowRestoreModal] = useState(false);
     const [backupMnemonic, setBackupMnemonic] = useState('');
+    const [backupData, setBackupData] = useState(null);
+    const [backupStep, setBackupStep] = useState(1); // 1 = show mnemonic, 2 = download JSON
     const [restoreMnemonic, setRestoreMnemonic] = useState('');
     const [restoreFile, setRestoreFile] = useState(null);
     const [backupStatus, setBackupStatus] = useState('');
@@ -171,11 +173,10 @@ function App() {
         try {
             const { backupData, mnemonic } = await createBackup(address);
 
-            // Download the backup file
-            downloadBackup(backupData, address);
-
-            // Show the mnemonic to the user
+            // Store backup data and mnemonic (don't auto-download yet)
+            setBackupData(backupData);
             setBackupMnemonic(mnemonic);
+            setBackupStep(1);
             setShowBackupModal(true);
             setBackupStatus('');
 
@@ -184,6 +185,13 @@ function App() {
             console.error('Error creating backup:', error);
             setBackupStatus('❌ Error: ' + error.message);
             showToast('Failed to create backup', 'error');
+        }
+    };
+
+    const handleDownloadBackup = () => {
+        if (backupData && address) {
+            downloadBackup(backupData, address);
+            showToast('Backup JSON downloaded!', 'success');
         }
     };
 
@@ -664,46 +672,31 @@ function App() {
             )}
 
             {/* Backup Mnemonic Modal */}
-            {showBackupModal && (
-                <div className="modal-overlay" onClick={() => setShowBackupModal(false)}>
-                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '650px'}}>
-                        <h2 style={{color: '#ff9800'}}>✅ Backup Created Successfully</h2>
+            {showBackupModal && backupStep === 1 && (
+                <div className="modal-overlay" onClick={() => {
+                    setShowBackupModal(false);
+                    setBackupStep(1);
+                    setBackupMnemonic('');
+                    setBackupData(null);
+                }}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '650px', backgroundColor: '#000', color: '#fff'}}>
+                        <h2 style={{color: '#fff', marginBottom: '20px'}}>🔐 Step 1: Save Your Recovery Phrase</h2>
 
-                        <div style={{backgroundColor: '#e3f2fd', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #2196F3'}}>
-                            <p style={{margin: '0 0 10px 0', fontWeight: 'bold', color: '#1976d2'}}>
-                                📦 Two Components Created:
+                        <div style={{backgroundColor: '#1a1a1a', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #333'}}>
+                            <p style={{margin: '0 0 10px 0', color: '#fff', fontSize: '14px'}}>
+                                Write down these 12 words in order. You'll need this phrase to decrypt your backup.
                             </p>
-                            <ol style={{margin: '8px 0', paddingLeft: '20px', color: '#424242', fontSize: '14px'}}>
-                                <li style={{marginBottom: '8px'}}>
-                                    <strong>JSON Backup File</strong> - Downloaded to your computer (chainmail-backup-{address?.slice(0, 8)}.json)
-                                    <br/>
-                                    <span style={{color: '#666', fontSize: '13px'}}>Contains your encrypted Signal Protocol identity and sessions</span>
-                                </li>
-                                <li style={{marginBottom: '0'}}>
-                                    <strong>12-Word Recovery Phrase</strong> - Shown below
-                                    <br/>
-                                    <span style={{color: '#666', fontSize: '13px'}}>The encryption key to decrypt your backup file</span>
-                                </li>
-                            </ol>
-                        </div>
-
-                        <div style={{backgroundColor: '#fff3cd', padding: '15px', borderRadius: '8px', marginBottom: '20px'}}>
-                            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>
-                                ⚠️ IMPORTANT: You Need BOTH to Restore
+                            <p style={{margin: '0', color: '#CEFF00', fontSize: '13px', fontWeight: 'bold'}}>
+                                ⚠️ Never share this phrase with anyone
                             </p>
-                            <ul style={{margin: '8px 0', paddingLeft: '20px', fontSize: '14px'}}>
-                                <li style={{marginBottom: '6px'}}>Write down these 12 words in order and store them safely</li>
-                                <li style={{marginBottom: '6px'}}>Keep the JSON file and recovery phrase in separate secure locations</li>
-                                <li style={{marginBottom: '0'}}>Never share your recovery phrase with anyone - it can decrypt your backup</li>
-                            </ul>
                         </div>
 
                         <div style={{
-                            backgroundColor: '#1a1a1a',
+                            backgroundColor: '#0a0a0a',
                             padding: '20px',
                             borderRadius: '8px',
                             marginBottom: '20px',
-                            border: '2px solid #2196F3'
+                            border: '2px solid #CEFF00'
                         }}>
                             <div style={{
                                 display: 'grid',
@@ -715,7 +708,7 @@ function App() {
                                 {backupMnemonic.split(' ').map((word, idx) => (
                                     <div key={idx} style={{
                                         padding: '8px 12px',
-                                        backgroundColor: '#0a0a0a',
+                                        backgroundColor: '#1a1a1a',
                                         borderRadius: '4px',
                                         display: 'flex',
                                         alignItems: 'center',
@@ -740,12 +733,73 @@ function App() {
                             </button>
                             <button
                                 onClick={() => {
-                                    setShowBackupModal(false);
-                                    setBackupMnemonic('');
+                                    setBackupStep(2);
                                 }}
                                 className="btn btn-primary"
                             >
-                                I've Saved It
+                                I've Saved It →
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Backup Download JSON Step */}
+            {showBackupModal && backupStep === 2 && (
+                <div className="modal-overlay" onClick={() => {
+                    setShowBackupModal(false);
+                    setBackupStep(1);
+                    setBackupMnemonic('');
+                    setBackupData(null);
+                }}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '600px', backgroundColor: '#000', color: '#fff'}}>
+                        <h2 style={{color: '#fff', marginBottom: '20px'}}>📦 Step 2: Download Backup File</h2>
+
+                        <div style={{backgroundColor: '#1a1a1a', padding: '20px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #333'}}>
+                            <p style={{margin: '0 0 15px 0', color: '#fff', fontSize: '15px'}}>
+                                Click below to download your encrypted backup JSON file.
+                            </p>
+                            <p style={{margin: '0 0 15px 0', color: '#CEFF00', fontSize: '14px', fontWeight: 'bold'}}>
+                                ⚠️ You need BOTH the recovery phrase AND this JSON file to restore
+                            </p>
+                            <ul style={{margin: '0', paddingLeft: '20px', color: '#aaa', fontSize: '13px'}}>
+                                <li style={{marginBottom: '8px'}}>Use this backup to log into multiple devices</li>
+                                <li style={{marginBottom: '8px'}}>Store the JSON file and recovery phrase in separate secure locations</li>
+                                <li style={{marginBottom: '0'}}>The JSON file is encrypted - useless without your recovery phrase</li>
+                            </ul>
+                        </div>
+
+                        <div style={{
+                            backgroundColor: '#0a0a0a',
+                            padding: '15px',
+                            borderRadius: '8px',
+                            marginBottom: '20px',
+                            border: '1px solid #CEFF00',
+                            textAlign: 'center'
+                        }}>
+                            <p style={{margin: '0 0 10px 0', color: '#CEFF00', fontSize: '13px', fontFamily: 'monospace'}}>
+                                chainmail-backup-{address?.slice(0, 8)}.json
+                            </p>
+                            <button
+                                onClick={handleDownloadBackup}
+                                className="btn btn-primary"
+                                style={{width: '100%', fontSize: '16px'}}
+                            >
+                                ⬇️ Download Backup JSON
+                            </button>
+                        </div>
+
+                        <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                            <button
+                                onClick={() => {
+                                    setShowBackupModal(false);
+                                    setBackupStep(1);
+                                    setBackupMnemonic('');
+                                    setBackupData(null);
+                                }}
+                                className="btn btn-secondary"
+                            >
+                                Done
                             </button>
                         </div>
                     </div>
