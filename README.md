@@ -17,12 +17,15 @@ Signal Protocol is the gold standard for secure messaging, used by Signal, Whats
 ## Key Features
 
 - **Signal Protocol (X3DH + Double Ratchet)**: Industry-standard end-to-end encryption
+- **BIP39 Backup/Restore**: Secure backup with 12-word mnemonic + AES-256-GCM encryption
 - **On-chain prekey bundles**: Public keys published as ethscriptions for key exchange
 - **Per-wallet identities**: Each Ethereum address has its own Signal identity
 - **Forward secrecy**: Every message uses new encryption keys
 - **ENS support**: Send to ENS names like vitalik.eth
 - **Privacy-first**: Messages self-sent (no recipient address visible on-chain)
 - **Browser-native**: Runs entirely in your browser using Web Crypto API
+
+> **Note**: UI/UX improvements are ongoing. Current focus is on refining the user experience and visual design.
 
 ## How It Works
 
@@ -124,12 +127,14 @@ Open http://localhost:3000
 
 ```
 ├── App.jsx                 # Main UI & message orchestration
+├── About.jsx               # Technical documentation page
 ├── signalProtocol.js       # X3DH + Double Ratchet core implementation
 ├── signalStore.js          # Session management & key storage
 ├── prekeyRegistry.js       # On-chain prekey bundle publishing/fetching
 ├── crypto.js               # High-level encryption wrapper
 ├── ethscription.js         # Ethscriptions API & message fetching
-└── messageIndex.js         # IndexedDB cache for messages
+├── messageIndex.js         # IndexedDB cache for messages
+└── backup.js               # BIP39 backup/restore with AES-256-GCM encryption
 ```
 
 ## Deployment (Vercel)
@@ -189,7 +194,15 @@ No. Forward secrecy means you use ephemeral keys that are discarded after sendin
 
 ### What if I lose my keys?
 
-Keys are stored in localStorage. If you clear browser data, you lose your keys. There is no recovery mechanism. This is by design.
+Keys are stored in localStorage. If you clear browser data, you lose your keys and session state.
+
+**Backup/Restore available**: Use the "Backup" button to create an encrypted backup:
+- Generates a 12-word BIP39 recovery phrase (encryption key)
+- Downloads encrypted JSON file with your Signal identity and session state
+- To restore: You need BOTH the JSON file AND the 12-word phrase
+- Store them separately for security
+
+Without a backup, key loss is permanent and by design for security.
 
 ### Can anyone see who I'm messaging?
 
