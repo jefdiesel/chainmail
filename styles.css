@@ -380,6 +380,39 @@ body {
     color: #CEFF00;
 }
 
+/* Prekey status indicators */
+.prekey-status {
+    display: block;
+    margin-top: 10px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+.prekey-ok {
+    background-color: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    color: #4caf50;
+}
+
+.prekey-warning {
+    background-color: rgba(255, 152, 0, 0.1);
+    border: 1px solid rgba(255, 152, 0, 0.3);
+    color: #ff9800;
+}
+
+.prekey-warning strong {
+    color: #CEFF00;
+    font-weight: 600;
+}
+
+.prekey-checking {
+    background-color: rgba(33, 150, 243, 0.1);
+    border: 1px solid rgba(33, 150, 243, 0.3);
+    color: #2196F3;
+}
+
 /* Messages */
 #messages-container {
     margin-top: 20px;

@@ -48,6 +48,7 @@ function App() {
     
     const [recipientAddress, setRecipientAddress] = useState('');
     const [recipientENS, setRecipientENS] = useState('');
+    const [recipientPrekeyStatus, setRecipientPrekeyStatus] = useState(null); // null = unchecked, true = has prekeys, false = no prekeys
     const [subjectText, setSubjectText] = useState('');
     const [messageText, setMessageText] = useState('');
     const [messages, setMessages] = useState([]);
@@ -59,6 +60,8 @@ function App() {
     const [hasPrekeys, setHasPrekeys] = useState(false);
     const [isPublishingPrekeys, setIsPublishingPrekeys] = useState(false);
     const [prekeyStatus, setPrekeyStatus] = useState('');
+    const [showSecurityWarning, setShowSecurityWarning] = useState(false);
+    const [pendingSendData, setPendingSendData] = useState(null);
 
     // Backup/Restore state
     const [showBackupModal, setShowBackupModal] = useState(false);
@@ -310,10 +313,15 @@ function App() {
     const handleRecipientChange = async (e) => {
         const input = e.target.value;
         setRecipientAddress(input);
-        
-        // Clear ENS display
+
+        // Clear previous status
         setRecipientENS('');
-        
+        setRecipientPrekeyStatus(null);
+
+        if (!input) return;
+
+        let resolvedAddress = input;
+
         // If input ends with .eth, try to resolve it
         if (input.endsWith('.eth') && walletClient) {
             try {
@@ -321,22 +329,36 @@ function App() {
                 const resolved = await provider.resolveName(input);
                 if (resolved) {
                     setRecipientENS(`→ ${resolved.slice(0, 6)}...${resolved.slice(-4)}`);
+                    resolvedAddress = resolved;
+                } else {
+                    setRecipientENS('❌ Not found');
+                    return;
                 }
             } catch (error) {
                 setRecipientENS('❌ Not found');
+                return;
+            }
+        }
+
+        // Check for prekeys if we have a valid address
+        if (resolvedAddress?.match(/^0x[a-fA-F0-9]{40}$/)) {
+            try {
+                const hasPrekeys = await hasPrekeyBundle(resolvedAddress);
+                setRecipientPrekeyStatus(hasPrekeys);
+            } catch (error) {
+                console.error('Error checking prekeys:', error);
+                setRecipientPrekeyStatus(null);
             }
         }
     };
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        
+
         if (!walletClient || !address) {
             showToast('Please connect your wallet', 'error');
             return;
         }
-
-        setSendStatus('Encrypting message...');
 
         try {
             // Get ethers provider and signer from walletClient
@@ -350,14 +372,28 @@ function App() {
             }
 
             // Check if recipient has prekeys
-            // Note: Don't clear cache here - it might have just been published
             const recipientHasPrekeys = await hasPrekeyBundle(resolvedAddress);
+
+            // If no prekeys, show warning modal and wait for confirmation
             if (!recipientHasPrekeys) {
-                showToast('⚠️ Recipient has not set up Chainmail. Using fallback encryption.', 'warning');
-                console.warn('Recipient missing prekeys, using v2.0 encryption');
-            } else {
-                console.log('✅ Recipient has prekeys, using Signal protocol');
+                setPendingSendData({ resolvedAddress, provider, signer });
+                setShowSecurityWarning(true);
+                return; // Wait for user confirmation
             }
+
+            // Proceed with sending (has prekeys)
+            await proceedWithSend(resolvedAddress, provider, signer);
+
+        } catch (error) {
+            console.error('Error sending message:', error);
+            setSendStatus('❌ Error: ' + error.message);
+            showToast('Failed to send message', 'error');
+        }
+    };
+
+    const proceedWithSend = async (resolvedAddress, provider, signer) => {
+        try {
+            setSendStatus('Encrypting message...');
 
             // Encrypt message with subject using Signal protocol (falls back to v2.0 if needed)
             const encryptedData = await encryptMessageSignal(
@@ -380,9 +416,11 @@ function App() {
 
             setSendStatus(`✅ Message sent! TX: ${result.txHash}`);
             showToast('Message sent successfully! 📬', 'success');
-            
+
             // Clear form
             setRecipientAddress('');
+            setRecipientENS('');
+            setRecipientPrekeyStatus(null);
             setSubjectText('');
             setMessageText('');
 
@@ -573,15 +611,36 @@ function App() {
                             <form onSubmit={handleSendMessage}>
                             <div className="form-group">
                                 <label htmlFor="recipient-address">Recipient Address or ENS:</label>
-                                <input 
-                                    type="text" 
-                                    id="recipient-address" 
-                                    placeholder="0x... or name.eth" 
+                                <input
+                                    type="text"
+                                    id="recipient-address"
+                                    placeholder="0x... or name.eth"
                                     value={recipientAddress}
                                     onChange={handleRecipientChange}
                                     required
                                 />
                                 {recipientENS && <small className="ens-helper">{recipientENS}</small>}
+
+                                {/* Prekey status indicators */}
+                                {recipientPrekeyStatus === true && (
+                                    <small className="prekey-status prekey-ok">
+                                        ✅ Full Signal Protocol encryption available
+                                    </small>
+                                )}
+
+                                {recipientPrekeyStatus === false && (
+                                    <small className="prekey-status prekey-warning">
+                                        ⚠️ No prekeys found - fallback encryption only
+                                        <br/>
+                                        <strong>Do not send sensitive information</strong>
+                                    </small>
+                                )}
+
+                                {recipientPrekeyStatus === null && recipientAddress && recipientAddress.length > 10 && (
+                                    <small className="prekey-status prekey-checking">
+                                        🔍 Checking encryption status...
+                                    </small>
+                                )}
                             </div>
                             <div className="form-group">
                                 <label htmlFor="subject-text">Subject: (optional, encrypted)</label>
@@ -861,6 +920,71 @@ function App() {
                                 disabled={!restoreFile || !restoreMnemonic.trim()}
                             >
                                 Restore Backup
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Security Warning Modal - No Prekeys */}
+            {showSecurityWarning && (
+                <div className="modal-overlay" onClick={() => setShowSecurityWarning(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '550px', backgroundColor: '#000', color: '#fff'}}>
+                        <h2 style={{color: '#ff9800', marginBottom: '20px'}}>
+                            ⚠️ Limited Encryption Warning
+                        </h2>
+
+                        <div style={{backgroundColor: '#1a1a1a', padding: '18px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #333'}}>
+                            <p style={{margin: '0 0 15px 0', color: '#fff', fontSize: '15px'}}>
+                                <strong>{recipientAddress}</strong> has not published encryption keys yet.
+                            </p>
+                            <p style={{margin: '0 0 15px 0', color: '#aaa', fontSize: '14px'}}>
+                                Your message will use <strong>fallback encryption</strong> without forward secrecy.
+                            </p>
+                            <p style={{margin: '0', color: '#CEFF00', fontSize: '14px', fontWeight: 'bold'}}>
+                                ⚠️ Do not send sensitive information
+                            </p>
+                        </div>
+
+                        <div style={{backgroundColor: '#0a0a0a', padding: '18px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #333'}}>
+                            <p style={{margin: '0 0 12px 0', color: '#fff', fontSize: '14px'}}>
+                                Share Chainmail with them to enable full Signal Protocol encryption:
+                            </p>
+                            <button
+                                onClick={() => {
+                                    const inviteMessage = `Try Chainmail for encrypted on-chain messaging!\n\nhttps://chainmail.app\n\nMy address: ${address}`;
+                                    navigator.clipboard.writeText(inviteMessage);
+                                    showToast('Invite link copied to clipboard!', 'success');
+                                }}
+                                className="btn btn-secondary"
+                                style={{width: '100%'}}
+                            >
+                                📋 Copy Invite Link
+                            </button>
+                        </div>
+
+                        <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                            <button
+                                onClick={() => {
+                                    setShowSecurityWarning(false);
+                                    setPendingSendData(null);
+                                }}
+                                className="btn btn-secondary"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setShowSecurityWarning(false);
+                                    if (pendingSendData) {
+                                        const { resolvedAddress, provider, signer } = pendingSendData;
+                                        await proceedWithSend(resolvedAddress, provider, signer);
+                                        setPendingSendData(null);
+                                    }
+                                }}
+                                className="btn btn-primary"
+                            >
+                                I Understand, Send Anyway
                             </button>
                         </div>
                     </div>
