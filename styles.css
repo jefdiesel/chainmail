@@ -206,31 +206,68 @@ body {
 }
 
 .status-badge {
-    padding: 20px 24px;
+    padding: 24px 28px;
     border-radius: 12px;
     font-size: 0.95rem;
     font-weight: 600;
     display: block;
     width: 100%;
+    margin-bottom: 30px;
 }
 
 .status-badge.status-warning {
-    background: rgba(255, 152, 0, 0.1);
+    background: rgba(255, 152, 0, 0.08);
     color: #ff9800;
-    border: 1px solid rgba(255, 152, 0, 0.3);
+    border: 2px solid rgba(255, 152, 0, 0.3);
 }
 
-.status-badge strong {
-    display: block;
-    margin-bottom: 6px;
-    font-size: 1.05rem;
+.status-badge-header {
+    margin-bottom: 12px;
 }
 
-.status-badge p {
+.status-badge-header strong {
+    font-size: 1.15rem;
+    color: #ff9800;
+}
+
+.status-badge-content {
+    margin-bottom: 18px;
+}
+
+.status-badge-text {
+    margin: 0 0 8px 0;
+    font-size: 1rem;
+    font-weight: 400;
+    line-height: 1.5;
+    color: #e0e0e0;
+}
+
+.status-badge-text strong {
+    color: #CEFF00;
+    font-weight: 700;
+}
+
+.status-badge-meta {
     margin: 0;
     font-size: 0.85rem;
     font-weight: 400;
-    opacity: 0.9;
+    color: #aaa;
+}
+
+.status-badge-link {
+    color: #CEFF00;
+    text-decoration: underline;
+    font-weight: 500;
+}
+
+.status-badge-link:hover {
+    color: #d4ff1a;
+}
+
+.status-badge-status {
+    margin-top: 12px;
+    font-size: 0.85rem;
+    color: #aaa;
 }
 
 .btn-sm {

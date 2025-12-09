@@ -587,29 +587,34 @@ function App() {
                 <>
                     {/* Prekey Setup Status */}
                     {!hasPrekeys && (
-                        <div className="status-badge status-warning" style={{marginBottom: '30px', maxWidth: '100%'}}>
-                            <strong>⚠️ Setup Required</strong>
-                            <p>
-                                Publish prekey bundle to receive <strong>SECURE</strong> messages (one-time, ~$0.03-0.10 gas)
-                                {' '}
-                                <a
-                                    href="https://github.com/jefdiesel/chainmail#i-received-a-message---whats-this-prekey-setup-about"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{color: '#CEFF00', textDecoration: 'underline'}}
-                                >
-                                    Why?
-                                </a>
-                            </p>
+                        <div className="status-badge status-warning">
+                            <div className="status-badge-header">
+                                <strong>⚠️ Setup Required</strong>
+                            </div>
+                            <div className="status-badge-content">
+                                <p className="status-badge-text">
+                                    Publish prekey bundle to receive <strong>SECURE</strong> messages
+                                </p>
+                                <p className="status-badge-meta">
+                                    One-time setup · ~$0.03-0.10 gas ·{' '}
+                                    <a
+                                        href="https://github.com/jefdiesel/chainmail#i-received-a-message---whats-this-prekey-setup-about"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="status-badge-link"
+                                    >
+                                        Why?
+                                    </a>
+                                </p>
+                            </div>
                             <button
                                 onClick={handlePublishPrekeys}
                                 disabled={isPublishingPrekeys}
-                                className="btn btn-primary btn-sm"
-                                style={{marginTop: '8px'}}
+                                className="btn btn-primary"
                             >
                                 {isPublishingPrekeys ? 'Publishing...' : 'Publish Prekey Bundle'}
                             </button>
-                            {prekeyStatus && <div style={{marginTop: '8px', fontSize: '0.85rem'}}>{prekeyStatus}</div>}
+                            {prekeyStatus && <div className="status-badge-status">{prekeyStatus}</div>}
                         </div>
                     )}
 
