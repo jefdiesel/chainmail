@@ -19,21 +19,28 @@ import {
     fetchPrekeyBundle
 } from './prekeyRegistry.js';
 import { toHex } from './signalProtocol.js';
-import { 
-    sendEncryptedMessage, 
+import {
+    sendEncryptedMessage,
     fetchMessagesForAddress,
     parseCalldata,
-    clearCache 
+    clearCache
 } from './ethscription.js';
-import { 
-    showToast 
+import {
+    showToast
 } from './notifications.js';
-import { 
+import {
     initDB,
     storeMessage,
     getMessagesForAddress as getCachedMessages,
-    batchStoreMessages 
+    batchStoreMessages
 } from './messageIndex.js';
+import {
+    createBackup,
+    restoreBackup,
+    downloadBackup,
+    readBackupFile
+} from './backup.js';
+import About from './About.jsx';
 
 function App() {
     const { address, isConnected } = useAccount();
@@ -52,6 +59,14 @@ function App() {
     const [hasPrekeys, setHasPrekeys] = useState(false);
     const [isPublishingPrekeys, setIsPublishingPrekeys] = useState(false);
     const [prekeyStatus, setPrekeyStatus] = useState('');
+
+    // Backup/Restore state
+    const [showBackupModal, setShowBackupModal] = useState(false);
+    const [showRestoreModal, setShowRestoreModal] = useState(false);
+    const [backupMnemonic, setBackupMnemonic] = useState('');
+    const [restoreMnemonic, setRestoreMnemonic] = useState('');
+    const [restoreFile, setRestoreFile] = useState(null);
+    const [backupStatus, setBackupStatus] = useState('');
 
     useEffect(() => {
         initDB();
@@ -145,6 +160,68 @@ function App() {
         }
     };
 
+    const handleExportBackup = async () => {
+        if (!address) {
+            showToast('Please connect your wallet', 'error');
+            return;
+        }
+
+        setBackupStatus('Creating encrypted backup...');
+
+        try {
+            const { backupData, mnemonic } = await createBackup(address);
+
+            // Download the backup file
+            downloadBackup(backupData, address);
+
+            // Show the mnemonic to the user
+            setBackupMnemonic(mnemonic);
+            setShowBackupModal(true);
+            setBackupStatus('');
+
+            showToast('Backup created! Save your recovery phrase!', 'success');
+        } catch (error) {
+            console.error('Error creating backup:', error);
+            setBackupStatus('❌ Error: ' + error.message);
+            showToast('Failed to create backup', 'error');
+        }
+    };
+
+    const handleImportBackup = async () => {
+        if (!restoreFile || !restoreMnemonic.trim()) {
+            showToast('Please select a backup file and enter your recovery phrase', 'error');
+            return;
+        }
+
+        setBackupStatus('Restoring from backup...');
+
+        try {
+            // Read the backup file
+            const backupData = await readBackupFile(restoreFile);
+
+            // Restore the backup
+            const restoredAddress = await restoreBackup(backupData, restoreMnemonic.trim());
+
+            setBackupStatus('✅ Backup restored successfully!');
+            showToast(`Backup restored for ${restoredAddress}`, 'success');
+
+            // Close modal and clear form
+            setShowRestoreModal(false);
+            setRestoreFile(null);
+            setRestoreMnemonic('');
+
+            // Reload the page to reinitialize with restored data
+            setTimeout(() => {
+                window.location.reload();
+            }, 2000);
+
+        } catch (error) {
+            console.error('Error restoring backup:', error);
+            setBackupStatus('❌ Error: ' + error.message);
+            showToast('Failed to restore backup', 'error');
+        }
+    };
+
     const loadMessages = async () => {
         if (!address) return;
 
@@ -152,15 +229,26 @@ function App() {
         try {
             // Clear API cache to force fresh fetch
             clearCache(address);
-            
-            // Get cached messages
-            let cachedMessages = await getCachedMessages(address);
 
-            // Fetch fresh messages
+            // Get cached decrypted messages from IndexedDB
+            const cachedMessages = await getCachedMessages(address);
+            const cachedMap = new Map(cachedMessages.map(msg => [msg.txHash, msg]));
+
+            // Fetch fresh messages from blockchain
             const freshMessages = await fetchMessagesForAddress(address);
 
-            // Use fresh messages directly (they're already filtered for this address)
-            setMessages(freshMessages);
+            // Merge: use cached decrypted content if available, otherwise use fresh message
+            const mergedMessages = freshMessages.map(freshMsg => {
+                const cached = cachedMap.get(freshMsg.txHash);
+                if (cached && cached.decrypted) {
+                    // Use cached message with decrypted content to prevent re-decryption
+                    return cached;
+                }
+                // New message or not yet decrypted
+                return freshMsg;
+            });
+
+            setMessages(mergedMessages);
         } catch (error) {
             console.error('Error loading messages:', error);
             showToast('Error loading messages', 'error');
@@ -406,6 +494,15 @@ function App() {
         }
     }, [messages.length, walletClient]);
 
+    // State for showing send message section
+    const [showSendMessage, setShowSendMessage] = useState(false);
+    const [currentPage, setCurrentPage] = useState('main'); // 'main' or 'about'
+
+    // If showing About page, render it instead of main app
+    if (currentPage === 'about') {
+        return <About onBack={() => setCurrentPage('main')} />;
+    }
+
     return (
         <div className="container">
             <header className="app-header">
@@ -414,9 +511,13 @@ function App() {
                         <span className="logo-emoji">⛓️</span>
                         <span className="logo-chain">Chain</span><span className="logo-mail">mail</span>
                     </h1>
-                    <div className="header-links-inline">
-                        <a className="header-link-inline" href="/about">About</a>
-                        <a className="header-link-inline" href="https://github.com/jefdiesel/chainmail" target="_blank" rel="noopener noreferrer">GitHub</a>
+                    <div className="header-links">
+                        <button className="header-link" onClick={() => setCurrentPage('about')}>About</button>
+                        <a className="header-link" href="https://github.com/jefdiesel/chainmail" target="_blank" rel="noopener noreferrer">GitHub</a>
+                        <button onClick={handleExportBackup} className="header-link">Backup</button>
+                        {isConnected && hasPrekeys && (
+                            <span className="header-status-check" title="Prekey setup ready">✓</span>
+                        )}
                     </div>
                 </div>
                 <div className="header-right">
@@ -424,51 +525,43 @@ function App() {
                 </div>
             </header>
 
-            {/* v3.0 Signal Protocol Notice */}
             {isConnected && (
                 <>
-                    <div className="security-notice">
-                        <strong>🔐 Chainmail v3.0 - Signal Protocol</strong>
-                        <p>
-                            Now using Signal Protocol (X3DH + Double Ratchet) for true end-to-end encryption.
-                            Perfect forward secrecy, post-compromise security, and 256-bit security.
-                        </p>
-                    </div>
-
                     {/* Prekey Setup Status */}
                     {!hasPrekeys && (
-                        <div className="security-notice" style={{backgroundColor: '#ff9800'}}>
+                        <div className="status-badge status-warning" style={{marginBottom: '30px'}}>
                             <strong>⚠️ Setup Required</strong>
-                            <p>
-                                You need to publish your prekey bundle before you can receive messages.
-                                This is a one-time setup that costs minimal gas (~$0.25-1).
-                            </p>
+                            <p>Publish prekey bundle to receive messages (one-time, ~$0.25-1 gas)</p>
                             <button
                                 onClick={handlePublishPrekeys}
                                 disabled={isPublishingPrekeys}
-                                className="btn btn-primary"
-                                style={{marginTop: '10px'}}
+                                className="btn btn-primary btn-sm"
+                                style={{marginTop: '8px'}}
                             >
                                 {isPublishingPrekeys ? 'Publishing...' : 'Publish Prekey Bundle'}
                             </button>
-                            {prekeyStatus && <div style={{marginTop: '10px'}}>{prekeyStatus}</div>}
+                            {prekeyStatus && <div style={{marginTop: '8px', fontSize: '0.85rem'}}>{prekeyStatus}</div>}
                         </div>
                     )}
 
-                    {hasPrekeys && prekeyStatus && (
-                        <div className="security-notice" style={{backgroundColor: '#4caf50'}}>
-                            {prekeyStatus}
-                        </div>
-                    )}
-                </>
-            )}
+                    {/* Action Bar */}
+                    <div className="action-bar">
+                        <h2 className="inbox-title" onClick={loadMessages} style={{cursor: 'pointer', margin: 0}} title="Click to refresh">
+                            📥 Inbox
+                        </h2>
+                        <button
+                            onClick={() => setShowSendMessage(!showSendMessage)}
+                            className="btn btn-primary"
+                        >
+                            ✉️ Send Encrypted Message
+                        </button>
+                    </div>
 
-            {isConnected && (
-                <div>
-                    {/* Send Message Section */}
-                    <div className="section">
-                        <h2>✉️ Send Encrypted Message</h2>
-                        <form onSubmit={handleSendMessage}>
+                    {/* Send Message Section - Collapsible */}
+                    {showSendMessage && (
+                        <div className="section send-message-section">
+                            <h2>✉️ Send Encrypted Message</h2>
+                            <form onSubmit={handleSendMessage}>
                             <div className="form-group">
                                 <label htmlFor="recipient-address">Recipient Address or ENS:</label>
                                 <input 
@@ -509,15 +602,11 @@ function App() {
                             </button>
                         </form>
                         {sendStatus && <div className="status-message">{sendStatus}</div>}
-                    </div>
+                        </div>
+                    )}
 
-                    {/* Received Messages Section */}
-                    <div className="section">
-                        <h2>📥 Your Messages</h2>
-                        <button onClick={loadMessages} className="btn btn-secondary">
-                            Refresh Messages
-                        </button>
-                        
+                    {/* Inbox Section */}
+                    <div className="section inbox-section">
                         {loading && <div className="loading">Loading messages...</div>}
                         
                         <div className="messages-container">
@@ -570,6 +659,156 @@ function App() {
                             )}
                         </div>
                     </div>
+                </>
+            )}
+
+            {/* Backup Mnemonic Modal */}
+            {showBackupModal && (
+                <div className="modal-overlay" onClick={() => setShowBackupModal(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '650px'}}>
+                        <h2 style={{color: '#ff9800'}}>✅ Backup Created Successfully</h2>
+
+                        <div style={{backgroundColor: '#e3f2fd', padding: '15px', borderRadius: '8px', marginBottom: '20px', border: '1px solid #2196F3'}}>
+                            <p style={{margin: '0 0 10px 0', fontWeight: 'bold', color: '#1976d2'}}>
+                                📦 Two Components Created:
+                            </p>
+                            <ol style={{margin: '8px 0', paddingLeft: '20px', color: '#424242', fontSize: '14px'}}>
+                                <li style={{marginBottom: '8px'}}>
+                                    <strong>JSON Backup File</strong> - Downloaded to your computer (chainmail-backup-{address?.slice(0, 8)}.json)
+                                    <br/>
+                                    <span style={{color: '#666', fontSize: '13px'}}>Contains your encrypted Signal Protocol identity and sessions</span>
+                                </li>
+                                <li style={{marginBottom: '0'}}>
+                                    <strong>12-Word Recovery Phrase</strong> - Shown below
+                                    <br/>
+                                    <span style={{color: '#666', fontSize: '13px'}}>The encryption key to decrypt your backup file</span>
+                                </li>
+                            </ol>
+                        </div>
+
+                        <div style={{backgroundColor: '#fff3cd', padding: '15px', borderRadius: '8px', marginBottom: '20px'}}>
+                            <p style={{margin: '0 0 10px 0', fontWeight: 'bold'}}>
+                                ⚠️ IMPORTANT: You Need BOTH to Restore
+                            </p>
+                            <ul style={{margin: '8px 0', paddingLeft: '20px', fontSize: '14px'}}>
+                                <li style={{marginBottom: '6px'}}>Write down these 12 words in order and store them safely</li>
+                                <li style={{marginBottom: '6px'}}>Keep the JSON file and recovery phrase in separate secure locations</li>
+                                <li style={{marginBottom: '0'}}>Never share your recovery phrase with anyone - it can decrypt your backup</li>
+                            </ul>
+                        </div>
+
+                        <div style={{
+                            backgroundColor: '#1a1a1a',
+                            padding: '20px',
+                            borderRadius: '8px',
+                            marginBottom: '20px',
+                            border: '2px solid #2196F3'
+                        }}>
+                            <div style={{
+                                display: 'grid',
+                                gridTemplateColumns: 'repeat(3, 1fr)',
+                                gap: '10px',
+                                fontFamily: 'monospace',
+                                fontSize: '16px'
+                            }}>
+                                {backupMnemonic.split(' ').map((word, idx) => (
+                                    <div key={idx} style={{
+                                        padding: '8px 12px',
+                                        backgroundColor: '#0a0a0a',
+                                        borderRadius: '4px',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        gap: '8px'
+                                    }}>
+                                        <span style={{color: '#666', fontSize: '12px', minWidth: '20px', textAlign: 'left'}}>{idx + 1}.</span>
+                                        <span style={{color: '#CEFF00', fontWeight: '600', flex: 1, textAlign: 'center'}}>{word}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end'}}>
+                            <button
+                                onClick={() => {
+                                    navigator.clipboard.writeText(backupMnemonic);
+                                    showToast('Recovery phrase copied to clipboard', 'success');
+                                }}
+                                className="btn btn-secondary"
+                            >
+                                📋 Copy to Clipboard
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowBackupModal(false);
+                                    setBackupMnemonic('');
+                                }}
+                                className="btn btn-primary"
+                            >
+                                I've Saved It
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Restore Backup Modal */}
+            {showRestoreModal && (
+                <div className="modal-overlay" onClick={() => setShowRestoreModal(false)}>
+                    <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{maxWidth: '500px'}}>
+                        <h2>📤 Restore from Backup</h2>
+                        <p style={{color: '#666', marginBottom: '20px'}}>
+                            Upload your backup file and enter your 12-word recovery phrase.
+                        </p>
+
+                        <div className="form-group">
+                            <label htmlFor="backup-file">Backup File:</label>
+                            <input
+                                type="file"
+                                id="backup-file"
+                                accept=".json"
+                                onChange={(e) => setRestoreFile(e.target.files[0])}
+                            />
+                            {restoreFile && (
+                                <small style={{color: '#4caf50'}}>
+                                    Selected: {restoreFile.name}
+                                </small>
+                            )}
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="restore-mnemonic">Recovery Phrase (12 words):</label>
+                            <textarea
+                                id="restore-mnemonic"
+                                rows="3"
+                                placeholder="Enter your 12-word recovery phrase separated by spaces..."
+                                value={restoreMnemonic}
+                                onChange={(e) => setRestoreMnemonic(e.target.value)}
+                            />
+                        </div>
+
+                        {backupStatus && <div className="status-message">{backupStatus}</div>}
+
+                        <div style={{display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '20px'}}>
+                            <button
+                                onClick={() => {
+                                    setShowRestoreModal(false);
+                                    setRestoreFile(null);
+                                    setRestoreMnemonic('');
+                                    setBackupStatus('');
+                                }}
+                                className="btn btn-secondary"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleImportBackup}
+                                className="btn btn-primary"
+                                disabled={!restoreFile || !restoreMnemonic.trim()}
+                            >
+                                Restore Backup
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>
@@ -577,5 +816,3 @@ function App() {
 }
 
 export default App;
-
-// Note: About modal UI is inserted into the app render when `showAbout` is true.

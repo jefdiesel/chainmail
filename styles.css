@@ -24,17 +24,17 @@ body {
 .app-header {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end;
     padding: 20px 0;
-    margin-bottom: 40px;
+    margin-bottom: 30px;
     border-bottom: 1px solid rgba(206, 255, 0, 0.1);
 }
 
 .header-left {
     flex: 1;
     display: flex;
-    align-items: center;
-    gap: 20px;
+    align-items: flex-end;
+    gap: 24px;
 }
 
 .header-right {
@@ -43,43 +43,25 @@ body {
 
 .header-links {
     display: inline-flex;
-    gap: 12px;
-    align-items: center;
-    margin-right: 12px;
+    gap: 16px;
+    align-items: flex-end;
+    padding-bottom: 4px;
 }
 
 .header-link {
     background: transparent;
-    border: 1px solid rgba(255,255,255,0.06);
-    color: #ccc;
-    padding: 8px 12px;
-    border-radius: 8px;
-    font-weight: 600;
+    border: none;
+    color: #999;
+    padding: 0;
+    font-size: 1.1rem;
+    font-weight: 500;
     text-decoration: none;
     cursor: pointer;
+    transition: color 0.2s;
+    font-family: inherit;
 }
 
 .header-link:hover {
-    background: rgba(206,255,0,0.06);
-    color: #fff;
-    border-color: rgba(206,255,0,0.2);
-}
-
-.header-links-inline {
-    display: flex;
-    gap: 16px;
-    align-items: center;
-}
-
-.header-link-inline {
-    color: #999;
-    text-decoration: none;
-    font-size: 0.95rem;
-    font-weight: 500;
-    transition: color 0.2s;
-}
-
-.header-link-inline:hover {
     color: #CEFF00;
 }
 
@@ -100,33 +82,107 @@ body {
 
 .logo-chain {
     color: #CEFF00;
+    letter-spacing: 0;
 }
 
 .logo-mail {
     color: #ffffff;
+    letter-spacing: 0;
 }
 
-/* Security Notice */
-.security-notice {
-    background: linear-gradient(135deg, rgba(206,255,0,0.08), rgba(206,255,0,0.04));
-    border: 1px solid rgba(206,255,0,0.2);
-    border-radius: 12px;
-    padding: 16px 20px;
-    margin: 0 0 30px 0;
+.header-status-check {
+    color: #4caf50;
+    font-size: 1.3rem;
+    font-weight: bold;
+    cursor: default;
+    margin-left: 8px;
 }
 
-.security-notice strong {
+/* Action Bar */
+.action-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.inbox-title {
+    font-size: 1.8rem;
+    font-weight: 600;
+    color: #ffffff;
+    transition: color 0.2s;
+}
+
+.inbox-title:hover {
     color: #CEFF00;
-    font-size: 1.1rem;
-    display: block;
-    margin-bottom: 8px;
 }
 
-.security-notice p {
-    color: #ccc;
+.status-badge {
+    padding: 12px 20px;
+    border-radius: 12px;
     font-size: 0.95rem;
-    line-height: 1.5;
+    font-weight: 600;
+    display: inline-block;
+}
+
+.status-badge.status-warning {
+    background: rgba(255, 152, 0, 0.1);
+    color: #ff9800;
+    border: 1px solid rgba(255, 152, 0, 0.3);
+}
+
+.status-badge strong {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 1.05rem;
+}
+
+.status-badge p {
     margin: 0;
+    font-size: 0.85rem;
+    font-weight: 400;
+    opacity: 0.9;
+}
+
+.btn-sm {
+    padding: 8px 16px;
+    font-size: 0.85rem;
+}
+
+/* Send Message Section */
+.send-message-section {
+    background: rgba(15, 15, 15, 0.6);
+    border: 1px solid rgba(206, 255, 0, 0.2);
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 30px;
+    animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        max-height: 0;
+        padding-top: 0;
+        padding-bottom: 0;
+    }
+    to {
+        opacity: 1;
+        max-height: 1000px;
+        padding-top: 24px;
+        padding-bottom: 24px;
+    }
+}
+
+.send-message-section h2 {
+    margin-top: 0;
+}
+
+/* Inbox Section */
+.inbox-section {
+    background: transparent;
 }
 
 .section {
@@ -466,6 +522,30 @@ body {
 }
 
 /* Modal */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
 .modal {
     position: fixed;
     top: 0;
