@@ -217,6 +217,66 @@ Check the browser console for logs showing:
 - `🔐 ratchetEncrypt: messageKey: ...`
 - `🔓 ratchetDecrypt: messageKey: ...`
 
+### What happens if I send to someone without prekeys?
+
+**Short answer:** Your message is still encrypted, but with fallback encryption instead of full Signal Protocol.
+
+**What this means:**
+- The app automatically detects if the recipient hasn't published prekeys yet
+- Shows a ⚠️ warning indicator while you're typing their address
+- Uses fallback encryption (v2.0: ephemeral ECDH + AES-256-GCM)
+- Message is still encrypted end-to-end - only the recipient can read it
+- However, it lacks **forward secrecy** - if their keys are compromised later, this message could be decrypted
+
+**Security warning modal:**
+When you try to send, a warning appears explaining:
+- "Do not send sensitive information"
+- Option to copy an invite link to share Chainmail with them
+- Requires explicit "I Understand, Send Anyway" confirmation
+
+**Best practices:**
+1. **Check the status indicator** - Look for ✅ (full encryption) or ⚠️ (fallback) before typing your message
+2. **Share Chainmail first** - Send them the app link and ask them to publish prekeys (takes 30 seconds, costs ~$0.03)
+3. **Save sensitive messages** - If you need to send something private, wait for them to set up or use another channel
+4. **It's still useful for** - Non-sensitive messages, initial contact, invitations, public announcements
+
+**Think of it like this:** Fallback encryption is like sending a locked box. Full Signal Protocol is like sending a locked box that self-destructs the key after opening and generates a new lock for every message. Both are secure, but Signal Protocol is future-proof against key compromise.
+
+The app makes this easy to understand with real-time status checks and clear warnings. You always know what level of encryption you're getting.
+
+### I received a message - what's this prekey setup about?
+
+**Congrats on your first Chainmail message!** 🎉
+
+Someone sent you an encrypted message. To read it and respond with full Signal Protocol encryption, you need to **publish your prekey bundle** (one-time setup).
+
+**What are prekeys?**
+Prekeys are public cryptographic keys that let others send you fully encrypted messages using the Signal Protocol (the same encryption used by Signal messenger and WhatsApp). They enable:
+- ✅ **Forward secrecy** - Past messages stay secure even if keys are compromised later
+- ✅ **Post-compromise security** - Future messages become secure again after key rotation
+- ✅ **Asynchronous messaging** - People can message you even when you're offline
+
+**How to set up (takes 30 seconds):**
+
+1. **Connect your wallet** - Click "Connect Wallet" (top right)
+2. **Publish prekeys** - Click the orange "Publish Prekey Bundle" button
+3. **Sign the transaction** - Costs about $0.03-0.10 in gas (one-time)
+4. **Done!** - You'll see a green ✓ checkmark when ready
+
+**After setup:**
+- Your pending message will automatically decrypt
+- Others can send you messages with full Signal Protocol encryption
+- You can respond with forward secrecy enabled
+- The green checkmark shows you're ready to receive messages
+
+**Why the cost?**
+The $0.03 gas fee publishes your prekeys to the Ethereum blockchain (as an ethscription). This is a one-time cost that makes you discoverable for encrypted messaging without any central server. True decentralization has a small price tag.
+
+**No prekeys published?**
+You can still receive messages with fallback encryption, but you won't have forward secrecy. If you're only receiving non-sensitive messages, you can skip setup. But for private conversations, publishing prekeys is highly recommended.
+
+[Get Started →](https://chainmail.app)
+
 ## Contributing
 
 Issues and PRs welcome! This is experimental cryptographic software - security audits appreciated.
