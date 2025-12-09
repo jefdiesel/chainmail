@@ -576,9 +576,20 @@ function App() {
                 <>
                     {/* Prekey Setup Status */}
                     {!hasPrekeys && (
-                        <div className="status-badge status-warning" style={{marginBottom: '30px'}}>
+                        <div className="status-badge status-warning" style={{marginBottom: '30px', maxWidth: '100%'}}>
                             <strong>⚠️ Setup Required</strong>
-                            <p>Publish prekey bundle to receive messages (one-time, ~$0.25-1 gas)</p>
+                            <p>
+                                Publish prekey bundle to receive <strong>SECURE</strong> messages (one-time, ~$0.03-0.10 gas)
+                                {' '}
+                                <a
+                                    href="https://github.com/jefdiesel/chainmail#i-received-a-message---whats-this-prekey-setup-about"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{color: '#CEFF00', textDecoration: 'underline'}}
+                                >
+                                    Why?
+                                </a>
+                            </p>
                             <button
                                 onClick={handlePublishPrekeys}
                                 disabled={isPublishingPrekeys}
