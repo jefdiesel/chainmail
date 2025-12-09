@@ -1,88 +1,226 @@
 
-# Chainmail — Encrypted On-Chain Messaging
+# Chainmail — Signal Protocol On-Chain Messaging
 
-Chainmail is a browser-based end-to-end encrypted messaging app that stores encrypted messages on-chain as ethscriptions. 
+Chainmail is an end-to-end encrypted messaging app that uses the **Signal Protocol** (X3DH + Double Ratchet) and stores messages on Ethereum as ethscriptions.
 
-**v2.0 Security Upgrade**: Now uses wallet-signature-based key derivation instead of deterministic address hashing. All messages use ephemeral keys by default for forward secrecy.
+**v3.0**: Full Signal Protocol implementation with X3DH key agreement and Double Ratchet algorithm for forward secrecy and post-compromise security.
 
-Key features
-------------
+## Why Signal Protocol?
 
-- **Secure key derivation**: Private keys derived from wallet signatures (not predictable from addresses)
-- **Ephemeral encryption**: Random keypair per message (forward secrecy by default)
-- **Privacy-first**: Messages self-sent (no wallet history pollution)
-- **ENS support**: Send and display ENS names
-- **Subject encryption**: Both subject and body encrypted together
-- **Optional outbox**: Disable forward secrecy to save copy you can decrypt later
+Signal Protocol is the gold standard for secure messaging, used by Signal, WhatsApp, and Facebook Messenger. It provides:
 
-Quick start
------------
+- **Perfect Forward Secrecy**: Compromising keys now doesn't reveal past messages
+- **Post-Compromise Security**: Future messages remain secure even after key compromise
+- **Authenticated Encryption**: Cryptographic proof messages haven't been tampered with
+- **Asynchronous Communication**: Send messages even when recipient is offline
 
-1. Install dependencies
+## Key Features
+
+- **Signal Protocol (X3DH + Double Ratchet)**: Industry-standard end-to-end encryption
+- **On-chain prekey bundles**: Public keys published as ethscriptions for key exchange
+- **Per-wallet identities**: Each Ethereum address has its own Signal identity
+- **Forward secrecy**: Every message uses new encryption keys
+- **ENS support**: Send to ENS names like vitalik.eth
+- **Privacy-first**: Messages self-sent (no recipient address visible on-chain)
+- **Browser-native**: Runs entirely in your browser using Web Crypto API
+
+## How It Works
+
+### First Time Setup
+1. Connect your wallet (MetaMask, etc.)
+2. Generate Signal identity (X25519 keys, registration ID)
+3. Publish prekey bundle on-chain as ethscription (~$0.20)
+4. Ready to send and receive encrypted messages
+
+### Sending a Message
+1. Fetch recipient's prekey bundle from chain
+2. Perform X3DH handshake to derive shared secret
+3. Initialize Double Ratchet with sender's ephemeral DH ratchet key
+4. Encrypt message with ratchet-derived key (AES-256-GCM)
+5. Self-send encrypted message as ethscription
+
+### Receiving a Message
+1. Fetch encrypted messages addressed to you
+2. For first message: Perform X3DH handshake, initialize Double Ratchet
+3. Advance ratchet state, derive message key
+4. Decrypt message (AES-256-GCM with authentication)
+5. Display plaintext message
+
+## Quick Start
+
+### Installation
 
 ```bash
 npm install
 ```
 
-2. Local development
+### Development
 
 ```bash
-# Copy example env and add key
+# Copy example env and add your Alchemy API key
 cp .env.example .env
-# Add your Alchemy API key in .env
+
+# Start dev server
 npm run dev
 ```
 
 Open http://localhost:3000
 
-Deployment (Vercel)
--------------------
+### First Message Flow
 
-Add the environment variable in your Vercel project settings:
+1. **Sender**: Click "Publish Prekeys" (one-time setup, ~$0.20)
+2. **Recipient**: Click "Publish Prekeys" (one-time setup, ~$0.20)
+3. **Sender**: Enter recipient address/ENS, type message, send
+4. **Recipient**: Refresh inbox to see decrypted message
 
-- `VITE_ALCHEMY_API_KEY` — your Alchemy API key (optional but required for historical fetching)
+## Technical Architecture
 
-If the key is not present, the app will run but will not be able to fetch past messages from the chain.
+### Cryptographic Primitives
 
-Files of interest
------------------
+- **X25519**: Elliptic curve Diffie-Hellman (key agreement)
+- **HKDF-SHA256**: Key derivation function
+- **AES-256-GCM**: Authenticated encryption (message encryption)
+- **Ed25519**: Digital signatures (prekey bundle signing)
 
-- `App.jsx` — main UI and orchestration
-- `crypto.js` — encryption and decryption logic (ECDH + AES-GCM)
-- `ethscription.js` — fetching/parsing ethscriptions and Alchemy interactions
-- `messageIndex.js` — IndexedDB cache
-- `styles.css` — theme and layout
+### Protocol Flow
 
-About & source
---------------
+```
+┌─────────────────┐                           ┌─────────────────┐
+│  Alice (Sender) │                           │  Bob (Recipient)│
+└────────┬────────┘                           └────────┬────────┘
+         │                                              │
+         │  1. Fetch Bob's prekey bundle               │
+         │────────────────────────────────────────────▶│
+         │     (identityKey, signedPreKey,             │
+         │      initialRatchetKey, oneTimePreKeys)     │
+         │                                              │
+         │  2. X3DH Handshake                          │
+         │     DH1 = DH(IKa, SPKb)                     │
+         │     DH2 = DH(EKa, IKb)                      │
+         │     DH3 = DH(EKa, SPKb)                     │
+         │     DH4 = DH(EKa, OPKb)                     │
+         │     SK = HKDF(DH1||DH2||DH3||DH4)           │
+         │                                              │
+         │  3. Initialize Double Ratchet               │
+         │     Generate new DH ratchet keypair         │
+         │     Derive root key & chain keys from SK    │
+         │                                              │
+         │  4. Encrypt message                         │
+         │     messageKey = ratchet.nextKey()          │
+         │     ciphertext = AES-GCM(messageKey, msg)   │
+         │                                              │
+         │  5. Send encrypted message on-chain         │
+         │────────────────────────────────────────────▶│
+         │     (x3dh params, header, iv, ciphertext)   │
+         │                                              │
+         │                                    6. Receive & decrypt
+         │                                       Initialize ratchet from x3dh
+         │                                       Derive same messageKey
+         │                                       Decrypt with AES-GCM
+         │                                              │
+```
 
-Visit the project repository: https://github.com/jefdiesel/chainmail
+### File Structure
 
-Security notes
---------------
+```
+├── App.jsx                 # Main UI & message orchestration
+├── signalProtocol.js       # X3DH + Double Ratchet core implementation
+├── signalStore.js          # Session management & key storage
+├── prekeyRegistry.js       # On-chain prekey bundle publishing/fetching
+├── crypto.js               # High-level encryption wrapper
+├── ethscription.js         # Ethscriptions API & message fetching
+└── messageIndex.js         # IndexedDB cache for messages
+```
 
-**v2.0 Architecture**:
+## Deployment (Vercel)
 
-- **Recipient keys**: Derived from wallet signature (one-time prompt per session) → only you can decrypt
-- **Sender keys**: Random ephemeral keypair per message → forward secrecy (you can't decrypt sent messages)
-- **Privacy**: Messages self-sent to your own address (no recipient wallet spam)
-- **Protocol**: `chainfeed.online` with base64-encoded JSON payloads
+Add environment variable in Vercel project settings:
 
-**Breaking change**: Old messages (v1.0) remain encrypted with legacy deterministic keys and cannot be migrated.
+- `VITE_ALCHEMY_API_KEY` — Your Alchemy API key (required for message fetching)
 
-**Threat model**:
-- ✅ Protects against: Passive surveillance, deterministic key cracking, wallet history analysis
-- ✅ Provides: Forward secrecy, deniability (for ephemeral messages)
-- ⚠️ Does not protect against: Compromised wallet private key, client-side malware, metadata analysis
+## Security Model
 
-This is experimental software. Use with caution.
+### What's Protected ✅
 
-License
--------
+- **Message confidentiality**: Only sender and recipient can read messages
+- **Forward secrecy**: Past messages safe even if keys compromised later
+- **Post-compromise security**: Future messages safe after re-keying
+- **Message authentication**: Cryptographic proof of sender identity
+- **Metadata privacy**: Recipient address hidden (messages self-sent)
+
+### Threat Model ⚠️
+
+**Does NOT protect against:**
+- Compromised wallet private key (game over)
+- Client-side malware (keylogger, screen capture)
+- Blockchain metadata analysis (timing, transaction patterns)
+- Network traffic analysis (message sizes, timing)
+
+**Breaking changes:**
+- v2.0 messages (ephemeral ECDH) cannot be decrypted
+- v1.0 messages (deterministic keys) cannot be decrypted
+
+### Key Storage
+
+- **Identity keys**: Stored in browser localStorage (persistent)
+- **Prekeys**: Stored locally + published on-chain (public)
+- **Session states**: Stored in memory (cleared on page reload)
+
+⚠️ **This is experimental software. Use at your own risk.**
+
+## Protocol Versions
+
+| Version | Protocol | Forward Secrecy | Notes |
+|---------|----------|-----------------|-------|
+| v1.0 | Deterministic ECDH | ❌ | Deprecated, insecure |
+| v2.0 | Ephemeral ECDH + AES-GCM | ✅ | No session continuity |
+| **v3.0** | **Signal Protocol (X3DH + Double Ratchet)** | **✅✅** | **Current** |
+
+## FAQ
+
+### How much does it cost?
+
+- Publishing prekeys: ~$0.20 (one-time per wallet)
+- Sending message: ~$0.20 per message (Ethereum mainnet)
+
+### Can I decrypt my sent messages?
+
+No. Forward secrecy means you use ephemeral keys that are discarded after sending. This is a security feature, not a bug.
+
+### What if I lose my keys?
+
+Keys are stored in localStorage. If you clear browser data, you lose your keys. There is no recovery mechanism. This is by design.
+
+### Can anyone see who I'm messaging?
+
+No. Messages are self-sent to your own address. The actual recipient is encrypted inside the message payload.
+
+### How do I verify it's working?
+
+Check the browser console for logs showing:
+- `✅ Signal session initialized`
+- X3DH handshake values
+- Double Ratchet key derivation
+- `🔐 ratchetEncrypt: messageKey: ...`
+- `🔓 ratchetDecrypt: messageKey: ...`
+
+## Contributing
+
+Issues and PRs welcome! This is experimental cryptographic software - security audits appreciated.
+
+## Resources
+
+- [Signal Protocol Specification](https://signal.org/docs/)
+- [X3DH Key Agreement](https://signal.org/docs/specifications/x3dh/)
+- [Double Ratchet Algorithm](https://signal.org/docs/specifications/doubleratchet/)
+- [Ethscriptions](https://ethscriptions.com/)
+
+## License
 
 MIT
 
-Author
-------
+## Author
 
 Built by jefdiesel — https://github.com/jefdiesel/chainmail
+
+**Powered by the Signal Protocol** — The same encryption used by Signal, WhatsApp, and 2+ billion users worldwide.
