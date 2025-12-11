@@ -184,11 +184,41 @@ CREATE INDEX idx_sender ON wraps(sender_identity_key);
 - [ ] Key generation + backup flow (in app)
 - [ ] UI to set your own ENS text records
 
-### M4: Messenger MVP
-- [ ] Inbox view (list received wraps)
-- [ ] Compose + send
-- [ ] Decrypt + view messages
-- [ ] Basic file attachments
+### M4: Wrap dApp MVP
+
+**Wallet Connection:**
+- [ ] RainbowKit / wagmi integration
+- [ ] Connect wallet → derive wrap keys (default)
+- [ ] Display wallet address + wrap identity key
+
+**Key Management UI:**
+- [ ] Generate keys (derived from wallet sig)
+- [ ] Import keys (paste JSON)
+- [ ] Export keys (download JSON)
+- [ ] Backup options:
+  - [ ] Download JSON file
+  - [ ] Send to another wrap wallet (encrypted)
+  - [ ] Cloud storage (future)
+- [ ] On import: auto-push `data:wrap-keys,` announcement tx
+
+**Send Form:**
+- [ ] Recipient input (ENS or 0x address)
+- [ ] Resolve recipient → fetch their wrap-keys from chain
+- [ ] Metadata fields:
+  - [ ] Name
+  - [ ] Subject
+  - [ ] Details
+  - [ ] Custom fields (add field name + value)
+- [ ] Image selector with preview
+- [ ] Chunking progress indicator
+- [ ] Send tx + show tx hash
+
+**Inbox / Decrypt View:**
+- [ ] Watch for incoming txs (indexer)
+- [ ] List received wraps (sender, timestamp, size)
+- [ ] Decrypt + view content
+- [ ] Reassemble chunked messages
+- [ ] Download attachments
 
 ### M5: Drop Box
 - [ ] Public inbox via ENS
