@@ -35,9 +35,11 @@ export {
   type FullKeyPair,
   type Recipient,
   type EncryptedPayload,
+  type WrapKeysAnnouncement,
 
   // Constants
   WRAP_PREFIX,
+  WRAP_KEYS_PREFIX,
   PROTOCOL_VERSION,
 
   // Key generation
@@ -54,6 +56,11 @@ export {
   isWrap,
   getSender,
   getRecipients,
+
+  // Wrap-keys announcements
+  announceKeys,
+  parseKeys,
+  isWrapKeys,
 
   // Utilities
   toHex,

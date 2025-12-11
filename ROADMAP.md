@@ -9,8 +9,11 @@ Encrypted on-chain archival and messaging. ENS for public identities, raw addres
 ## Phase 1: Core Infrastructure
 
 ### Indexer
-- [ ] Scan Base blocks for `data:wrap,` calldata
-- [ ] Index by sender/recipient identity keys
+- [ ] Scan Base blocks for:
+  - `data:wrap,` - encrypted messages
+  - `data:wrap-keys,` - key announcements
+- [ ] Index messages by sender/recipient identity keys
+- [ ] Index wrap-keys by address (from tx sender)
 - [ ] Track chunk sets (id, parts received, complete status)
 - [ ] Store tx hashes + block numbers for retrieval
 - [ ] Support historical backfill + live streaming

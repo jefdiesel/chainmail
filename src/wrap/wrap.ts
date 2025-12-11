@@ -61,6 +61,7 @@ export interface EncryptedPayload {
 // ============================================================================
 
 export const WRAP_PREFIX = 'data:wrap,';
+export const WRAP_KEYS_PREFIX = 'data:wrap-keys,';
 export const PROTOCOL_VERSION = 2;
 
 // ============================================================================
@@ -350,4 +351,49 @@ export function getRecipients(calldata: string): string[] {
   } catch {
     return [];
   }
+}
+
+// ============================================================================
+// Wrap Keys Announcement
+// ============================================================================
+
+export interface WrapKeysAnnouncement {
+  identityKey: string;
+  signedPreKey: string;
+  timestamp: number;
+}
+
+/**
+ * Create wrap-keys announcement calldata
+ */
+export function announceKeys(keys: FullKeyPair): string {
+  const announcement: WrapKeysAnnouncement = {
+    identityKey: toHex(keys.identity.publicKey),
+    signedPreKey: toHex(keys.signedPreKey.publicKey),
+    timestamp: Date.now(),
+  };
+  return WRAP_KEYS_PREFIX + Buffer.from(JSON.stringify(announcement)).toString('base64');
+}
+
+/**
+ * Parse wrap-keys announcement from calldata
+ */
+export function parseKeys(calldata: string): WrapKeysAnnouncement | null {
+  if (!calldata.startsWith(WRAP_KEYS_PREFIX)) {
+    return null;
+  }
+
+  try {
+    const base64 = calldata.slice(WRAP_KEYS_PREFIX.length);
+    return JSON.parse(Buffer.from(base64, 'base64').toString());
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Check if calldata is a wrap-keys announcement
+ */
+export function isWrapKeys(calldata: string): boolean {
+  return calldata.startsWith(WRAP_KEYS_PREFIX);
 }
