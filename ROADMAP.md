@@ -40,11 +40,11 @@ CREATE INDEX idx_sender ON wraps(sender_identity_key);
 
 **Index Compression (future):**
 - Offload indexed wrap tx hashes to chain as batched tx
-- ~66 bytes per tx hash (32 bytes hex + overhead)
-- 128KB limit = ~1,900 tx hashes per batch
+- 1,111 tx hashes per batch (~73KB, safe margin)
 - Periodic checkpoint: "all wraps from block X to Y are indexed"
 - Self-referential: wrap index stored via wrap protocol
 - Decentralizes the index itself
+- Anyone can verify/rebuild index from chain
 
 ### ENS Integration
 - [ ] Set wrap keys via ENS app (text records)
