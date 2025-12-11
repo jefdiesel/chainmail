@@ -1,10 +1,6 @@
 /**
  * Wrap Protocol - Key Registry
- * ENS for public identities, raw addresses for private/anonymous use
- *
- * ENS text records:
- *   - wrap.identityKey: X25519 identity public key (hex)
- *   - wrap.signedPreKey: X25519 signed prekey (hex)
+ * ENS resolves to address, then fetch prekeys from chain
  */
 
 import { createPublicClient, http } from 'viem';
@@ -19,22 +15,13 @@ import { type KeyBundle, bundleFromHex, bundleToHex } from './wrap.js';
 export interface ResolvedIdentity {
   address: string;
   ensName?: string;
-  bundle: KeyBundle;
+  bundle?: KeyBundle; // From on-chain prekey announcement
 }
 
 export interface RegistryConfig {
   chainId?: number;
   rpcUrl?: string;
 }
-
-// ============================================================================
-// ENS Text Record Keys
-// ============================================================================
-
-export const ENS_KEYS = {
-  IDENTITY_KEY: 'wrap.identityKey',
-  SIGNED_PRE_KEY: 'wrap.signedPreKey',
-} as const;
 
 // ============================================================================
 // Chain Configuration
@@ -59,57 +46,26 @@ function getClient(config?: RegistryConfig) {
 }
 
 // ============================================================================
-// ENS Resolution (Public Identities)
+// ENS Resolution
 // ============================================================================
 
 /**
- * Resolve ENS name to key bundle
- * Works on mainnet and Base (via CCIP-Read)
+ * Resolve ENS name to address
+ * Prekeys are fetched separately from chain by address
  */
 export async function resolveENS(
   ensName: string,
   config?: RegistryConfig
-): Promise<ResolvedIdentity | null> {
+): Promise<string | null> {
   const client = getClient(config);
 
   try {
     const normalizedName = normalize(ensName);
-
-    // Get address
     const address = await client.getEnsAddress({ name: normalizedName });
-    if (!address) {
-      return null;
-    }
-
-    // Get wrap keys from text records
-    const [identityKey, signedPreKey] = await Promise.all([
-      client.getEnsText({ name: normalizedName, key: ENS_KEYS.IDENTITY_KEY }),
-      client.getEnsText({ name: normalizedName, key: ENS_KEYS.SIGNED_PRE_KEY }),
-    ]);
-
-    if (!identityKey || !signedPreKey) {
-      return null; // No wrap keys registered
-    }
-
-    return {
-      address,
-      ensName: normalizedName,
-      bundle: bundleFromHex({ identityKey, signedPreKey }),
-    };
+    return address || null;
   } catch {
     return null;
   }
-}
-
-/**
- * Check if ENS name has wrap keys registered
- */
-export async function hasWrapKeys(
-  ensName: string,
-  config?: RegistryConfig
-): Promise<boolean> {
-  const resolved = await resolveENS(ensName, config);
-  return resolved !== null;
 }
 
 // ============================================================================
@@ -175,43 +131,38 @@ export function importRegistry(data: Record<string, { identityKey: string; signe
 // ============================================================================
 
 /**
- * Resolve identifier to key bundle
- * Tries ENS first (if looks like ENS name), then address registry
+ * Resolve identifier to address
+ * - ENS name (alice.eth) → resolves via ENS
+ * - Address (0x...) → returns as-is
+ *
+ * Prekeys are fetched from chain separately (indexer looks up prekey announcements)
  */
 export async function resolve(
   identifier: string,
   config?: RegistryConfig
-): Promise<ResolvedIdentity | null> {
-  // Check if it looks like an ENS name
+): Promise<string | null> {
+  // ENS name
   if (identifier.includes('.')) {
-    const ensResult = await resolveENS(identifier, config);
-    if (ensResult) {
-      return ensResult;
-    }
+    return resolveENS(identifier, config);
   }
 
-  // Try address registry
-  const bundle = getAddressBundle(identifier);
-  if (bundle) {
-    return {
-      address: identifier,
-      bundle,
-    };
+  // Already an address
+  if (identifier.startsWith('0x') && identifier.length === 42) {
+    return identifier;
   }
 
   return null;
 }
 
 /**
- * Resolve multiple identifiers
+ * Resolve multiple identifiers to addresses
  */
 export async function resolveMany(
   identifiers: string[],
   config?: RegistryConfig
-): Promise<Map<string, ResolvedIdentity | null>> {
-  const results = new Map<string, ResolvedIdentity | null>();
+): Promise<Map<string, string | null>> {
+  const results = new Map<string, string | null>();
 
-  // Resolve in parallel
   const resolutions = await Promise.all(
     identifiers.map(async (id) => ({
       id,
@@ -224,20 +175,4 @@ export async function resolveMany(
   }
 
   return results;
-}
-
-// ============================================================================
-// ENS Text Record Helpers (for setting keys)
-// ============================================================================
-
-/**
- * Generate ENS text record values for a key bundle
- * User needs to set these via ENS app or contract call
- */
-export function getENSTextRecords(bundle: KeyBundle): Array<{ key: string; value: string }> {
-  const hex = bundleToHex(bundle);
-  return [
-    { key: ENS_KEYS.IDENTITY_KEY, value: hex.identityKey },
-    { key: ENS_KEYS.SIGNED_PRE_KEY, value: hex.signedPreKey },
-  ];
 }

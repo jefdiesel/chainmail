@@ -90,21 +90,16 @@ export {
   type ResolvedIdentity,
   type RegistryConfig,
 
-  // ENS
-  ENS_KEYS,
+  // ENS → address
   resolveENS,
-  hasWrapKeys,
-  getENSTextRecords,
+  resolve,
+  resolveMany,
 
-  // Address registry
+  // Local address registry (for caching prekeys)
   registerAddress,
   getAddressBundle,
   unregisterAddress,
   clearRegistry,
   exportRegistry,
   importRegistry,
-
-  // Unified
-  resolve,
-  resolveMany,
 } from './registry.js';
