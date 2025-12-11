@@ -1,0 +1,13 @@
+name = "wrap-indexer"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[vars]
+ALCHEMY_KEY = "zQCBzfLN5hsgfwPQ1Gagu"
+
+[[kv_namespaces]]
+binding = "WRAP_KEYS"
+id = "f9016bb38cfc40f1a6af5a149bb0ad87"
+
+[triggers]
+crons = ["*/1 * * * *"] # Run every minute

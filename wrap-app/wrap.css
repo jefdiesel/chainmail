@@ -1,0 +1,529 @@
+/* Wrap dApp Styles */
+
+.wrap-app {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #eee;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+nav {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+nav button {
+  padding: 10px 20px;
+  border: 1px solid #ddd;
+  background: #fff;
+  color: #333;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+nav button.active {
+  background: #0066ff;
+  color: white;
+  border-color: #0066ff;
+}
+
+nav button:hover:not(.active) {
+  background: #f5f5f5;
+}
+
+/* Key Manager */
+.key-manager {
+  padding: 20px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.key-manager h3 {
+  margin-top: 0;
+}
+
+.identity-key {
+  font-size: 14px;
+  color: #666;
+}
+
+.identity-key code {
+  background: #eee;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.key-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+
+.key-actions .backup-btn {
+  background: #22c55e;
+}
+
+.key-actions .backup-btn:hover {
+  background: #16a34a;
+}
+
+.salt-input {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+  align-items: center;
+}
+
+.salt-input input {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 14px;
+  width: 180px;
+}
+
+.salt-notice {
+  margin-top: 15px;
+  padding: 10px;
+  background: #fef3c7;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.salt-notice code {
+  background: #fde68a;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.publish-btn {
+  background: #f59e0b;
+}
+
+.publish-btn:hover {
+  background: #d97706;
+}
+
+.publish-btn.large {
+  padding: 16px 32px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Setup Flow */
+.setup-flow {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.setup-step {
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.setup-instruction {
+  font-size: 16px;
+  color: #666;
+  margin-bottom: 20px;
+}
+
+.salt-badge {
+  margin-left: 10px;
+  padding: 2px 8px;
+  background: #fde68a;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.import-modal {
+  margin-top: 15px;
+  padding: 15px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+}
+
+.import-modal textarea {
+  width: 100%;
+  height: 120px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+/* Send Form */
+.send-form {
+  padding: 20px;
+}
+
+.send-form h3 {
+  margin-top: 0;
+}
+
+.field {
+  margin-bottom: 15px;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.field input,
+.field textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.field textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.input-row {
+  display: flex;
+  gap: 10px;
+}
+
+.input-row input {
+  flex: 1;
+}
+
+.hint {
+  display: block;
+  margin-top: 5px;
+  font-size: 12px;
+  color: #666;
+}
+
+.custom-fields {
+  margin-bottom: 15px;
+}
+
+.custom-field-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.custom-field-row input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.image-preview {
+  max-width: 200px;
+  max-height: 200px;
+  margin-top: 10px;
+  border-radius: 6px;
+}
+
+/* Recipients list for To/CC */
+.recipients-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 15px;
+  padding: 10px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  min-height: 40px;
+}
+
+.recipient-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  background: #e0e7ff;
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: monospace;
+}
+
+.recipient-tag.cc {
+  background: #fef3c7;
+}
+
+.type-badge {
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: #4f46e5;
+  color: white;
+}
+
+.recipient-tag.cc .type-badge {
+  background: #d97706;
+}
+
+.remove-btn {
+  background: none;
+  border: none;
+  padding: 0 2px;
+  font-size: 16px;
+  color: #666;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.remove-btn:hover {
+  color: #dc2626;
+  background: none;
+}
+
+/* Invite prompt */
+.invite-prompt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0;
+  padding: 10px;
+  background: #fef3c7;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.invite-btn {
+  background: #f59e0b;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.invite-btn:hover {
+  background: #d97706;
+}
+
+/* Invite banner */
+.invite-banner {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  text-align: center;
+  font-size: 15px;
+}
+
+/* Inbox */
+.inbox {
+  padding: 20px;
+}
+
+.inbox h3 {
+  margin-top: 0;
+}
+
+.inbox .empty {
+  color: #999;
+  font-style: italic;
+}
+
+.message-list {
+  list-style: none;
+  padding: 0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.message-list li {
+  padding: 12px 15px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.message-list li:hover {
+  background: #f5f5f5;
+}
+
+.message-list li.selected {
+  background: #e8f4ff;
+  border-color: #0066ff;
+}
+
+.msg-from {
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.msg-time {
+  font-size: 12px;
+  color: #666;
+}
+
+.tx-link {
+  font-family: monospace;
+  font-size: 13px;
+  color: #0066ff;
+  text-decoration: none;
+}
+
+.tx-link:hover {
+  text-decoration: underline;
+}
+
+.message-detail {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f9f9f9;
+  border-radius: 8px;
+}
+
+.message-detail h4 {
+  margin-top: 0;
+}
+
+.decrypted-content {
+  margin-top: 15px;
+  padding: 15px;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.msg-image {
+  max-width: 100%;
+  max-height: 300px;
+  margin-top: 10px;
+  border-radius: 6px;
+}
+
+.error {
+  color: #dc2626;
+  padding: 10px;
+  background: #fef2f2;
+  border-radius: 6px;
+}
+
+/* Buttons */
+button {
+  padding: 10px 16px;
+  background: #0066ff;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+button:hover {
+  background: #0052cc;
+}
+
+button:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+/* Status */
+.status {
+  margin-top: 10px;
+  padding: 10px;
+  background: #f0f7ff;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #0066ff;
+}
+
+/* Dark mode */
+@media (prefers-color-scheme: dark) {
+  .wrap-app {
+    background: #1a1a1a;
+    color: #fff;
+  }
+
+  header {
+    border-color: #333;
+  }
+
+  nav button {
+    background: #2a2a2a;
+    border-color: #444;
+    color: #fff;
+  }
+
+  nav button:hover:not(.active) {
+    background: #333;
+  }
+
+  .key-manager {
+    background: #2a2a2a;
+  }
+
+  .identity-key code {
+    background: #333;
+  }
+
+  .import-modal {
+    background: #2a2a2a;
+    border-color: #444;
+  }
+
+  .import-modal textarea,
+  .field input,
+  .field textarea,
+  .custom-field-row input {
+    background: #333;
+    border-color: #444;
+    color: #fff;
+  }
+
+  .inbox li {
+    border-color: #333;
+  }
+
+  .status {
+    background: #1a2a3a;
+  }
+
+  .recipients-list {
+    background: #333;
+  }
+
+  .recipient-tag {
+    background: #3730a3;
+  }
+
+  .recipient-tag.cc {
+    background: #78350f;
+  }
+
+  .remove-btn {
+    color: #aaa;
+  }
+}
