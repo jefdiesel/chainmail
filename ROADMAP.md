@@ -14,7 +14,29 @@ Encrypted on-chain archival and messaging. ENS for public identities, raw addres
 - [ ] Track chunk sets (id, parts received, complete status)
 - [ ] Store tx hashes + block numbers for retrieval
 - [ ] Support historical backfill + live streaming
-- [ ] SQLite for local, Postgres for hosted
+
+**Infrastructure:**
+- Cloudflare Worker (indexer logic, cron every 10-30 sec)
+- Cloudflare D1 (SQLite at edge, 5M rows / 5GB free)
+- Alchemy Base RPC (300M compute units/mo free)
+  - ~25M CUs/month for continuous indexing (12x headroom)
+  - eth_getBlockByNumber: ~20 CUs
+  - eth_getLogs: 75 CUs
+
+**Schema:**
+```sql
+CREATE TABLE wraps (
+  tx_hash TEXT PRIMARY KEY,
+  block_number INTEGER,
+  block_timestamp INTEGER,
+  from_address TEXT,
+  sender_identity_key TEXT,
+  recipient_identity_keys TEXT,  -- JSON array
+  calldata_size INTEGER
+);
+CREATE INDEX idx_recipient ON wraps(recipient_identity_keys);
+CREATE INDEX idx_sender ON wraps(sender_identity_key);
+```
 
 ### ENS Integration
 - [ ] Set wrap keys via ENS app (text records)
