@@ -62,6 +62,7 @@ async function indexBlock(env, blockNumber) {
         // It's an encrypted message
         messages.push({
           from: tx.from.toLowerCase(),
+          to: tx.to.toLowerCase(),
           txHash: tx.hash,
           blockNumber,
           timestamp: parseInt(block.timestamp, 16) * 1000,
@@ -77,14 +78,16 @@ export default {
   // Cron trigger - index new blocks
   async scheduled(event, env, ctx) {
     const currentBlock = parseInt(await rpc(env, 'eth_blockNumber', []), 16);
-    const lastBlock = parseInt(await env.WRAP_KEYS.get('_lastBlock') || '0', 10);
+    const lastBlockStr = await env.WRAP_KEYS.get('_lastBlock');
+    const lastBlock = lastBlockStr ? parseInt(lastBlockStr, 10) : currentBlock - 5;
 
-    // Start from last block or recent
-    const startBlock = lastBlock || currentBlock - 100;
+    // Limit to 20 blocks per cron to avoid CPU timeout
+    const maxBlocks = 20;
+    const endBlock = Math.min(lastBlock + maxBlocks, currentBlock);
 
-    console.log(`Indexing from ${startBlock} to ${currentBlock}`);
+    console.log(`Indexing from ${lastBlock + 1} to ${endBlock} (current: ${currentBlock})`);
 
-    for (let block = startBlock + 1; block <= currentBlock; block++) {
+    for (let block = lastBlock + 1; block <= endBlock; block++) {
       const { keys, messages } = await indexBlock(env, block);
 
       for (const entry of keys) {
@@ -108,7 +111,7 @@ export default {
       }
     }
 
-    await env.WRAP_KEYS.put('_lastBlock', currentBlock.toString());
+    await env.WRAP_KEYS.put('_lastBlock', endBlock.toString());
   },
 
   // HTTP handler - lookup keys
