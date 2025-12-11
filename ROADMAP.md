@@ -92,8 +92,17 @@ Encrypted on-chain archival and messaging. ENS for public identities, raw addres
 
 ## Phase 5: Future
 
+### Base Account Integration
+- [ ] Passkey-based smart wallet onboarding
+- [ ] No seed phrase, no wallet install friction
+- [ ] One-tap USDC payments for premium features
+- [ ] Universal identity across Base apps
+- [ ] Self-custodial (we never touch keys)
+- [ ] Ref: https://docs.base.org/base-account/overview/what-is-base-account
+
 ### WebAuthn PRF (see FUTURE_IDEAS.md)
-- [ ] Passkey-derived encryption keys
+- [ ] Passkey-derived encryption keys (for wrap protocol itself)
+- [ ] Combine with Base Account for seamless UX
 - [ ] No seed phrase needed
 - [ ] Hardware-backed security
 - [ ] Wait for broader platform support (~2026)
