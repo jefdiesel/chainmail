@@ -1,16 +1,43 @@
 {
-  "name": "secrechat-ethscription",
-  "version": "1.0.0",
-  "description": "Secure encrypted on-chain messaging with ethscriptions",
+  "name": "@chainmail/wrap",
+  "version": "0.1.0",
+  "description": "Multi-recipient X3DH encrypted on-chain archival protocol",
   "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "tsc",
     "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+    "build:app": "vite build",
+    "preview": "vite preview",
+    "test": "node --experimental-vm-modules test/wrap.test.js"
   },
   "dependencies": {
     "@noble/curves": "^2.0.1",
     "@noble/hashes": "^2.0.1",
+    "viem": "^2.41.2"
+  },
+  "devDependencies": {
+    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
+    "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
+    "@types/node": "^22.19.2",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "stream-browserify": "^3.0.0",
+    "typescript": "^5.9.3",
+    "util": "^0.12.5",
+    "vite": "^5.0.0"
+  },
+  "peerDependencies": {
     "@rainbow-me/rainbowkit": "^2.2.10",
     "@scure/bip39": "^2.0.1",
     "@tanstack/react-query": "^5.90.12",
@@ -19,16 +46,47 @@
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-router-dom": "^7.10.1",
-    "viem": "^2.41.2",
     "wagmi": "^2.19.5"
   },
-  "devDependencies": {
-    "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
-    "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
-    "buffer": "^6.0.3",
-    "crypto-browserify": "^3.12.1",
-    "stream-browserify": "^3.0.0",
-    "util": "^0.12.5",
-    "vite": "^5.0.0"
-  }
+  "peerDependenciesMeta": {
+    "@rainbow-me/rainbowkit": {
+      "optional": true
+    },
+    "@scure/bip39": {
+      "optional": true
+    },
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "@vitejs/plugin-react": {
+      "optional": true
+    },
+    "ethers": {
+      "optional": true
+    },
+    "react": {
+      "optional": true
+    },
+    "react-dom": {
+      "optional": true
+    },
+    "react-router-dom": {
+      "optional": true
+    },
+    "wagmi": {
+      "optional": true
+    }
+  },
+  "keywords": [
+    "encryption",
+    "x3dh",
+    "ethereum",
+    "base",
+    "l2",
+    "on-chain",
+    "archival",
+    "wrap"
+  ],
+  "author": "Chainmail",
+  "license": "MIT"
 }
