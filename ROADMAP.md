@@ -38,6 +38,14 @@ CREATE INDEX idx_recipient ON wraps(recipient_identity_keys);
 CREATE INDEX idx_sender ON wraps(sender_identity_key);
 ```
 
+**Index Compression (future):**
+- Offload indexed wrap tx hashes to chain as batched tx
+- ~66 bytes per tx hash (32 bytes hex + overhead)
+- 128KB limit = ~1,900 tx hashes per batch
+- Periodic checkpoint: "all wraps from block X to Y are indexed"
+- Self-referential: wrap index stored via wrap protocol
+- Decentralizes the index itself
+
 ### ENS Integration
 - [ ] Set wrap keys via ENS app (text records)
   - `wrap.identityKey` - X25519 identity public key
@@ -154,11 +162,39 @@ CREATE INDEX idx_sender ON wraps(sender_identity_key);
 
 ## Milestones
 
-1. **v0.1** - Indexer + basic message retrieval
-2. **v0.2** - ENS integration + API
-3. **v0.3** - Messenger app MVP
-4. **v0.4** - Drop box feature
-5. **v1.0** - Production ready
+### M1: Protocol Complete
+- [x] X3DH multi-recipient encryption
+- [x] Chunking for large payloads
+- [x] `data:wrap,` calldata format
+- [x] Test suite passing
+- [ ] npm package published
+
+### M2: Indexer Live
+- [ ] CF Worker scanning Base blocks
+- [ ] D1 storing wrap tx metadata
+- [ ] API endpoints for query
+- [ ] Backfill historical wraps
+
+### M3: Identity
+- [ ] ENS text record integration
+- [ ] Key generation + backup flow
+- [ ] Resolve by ENS or address
+
+### M4: Messenger MVP
+- [ ] Inbox view (list received wraps)
+- [ ] Compose + send
+- [ ] Decrypt + view messages
+- [ ] Basic file attachments
+
+### M5: Drop Box
+- [ ] Public inbox via ENS
+- [ ] Anonymous sender support
+- [ ] Drag-drop upload
+
+### M6: Production
+- [ ] Base Account passkey login
+- [ ] Mobile responsive
+- [ ] Index checkpoints on-chain
 
 ---
 
