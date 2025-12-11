@@ -176,9 +176,10 @@ CREATE INDEX idx_sender ON wraps(sender_identity_key);
 - [ ] Backfill historical wraps
 
 ### M3: Identity
-- [ ] ENS text record integration
-- [ ] Key generation + backup flow
-- [ ] Resolve by ENS or address
+- [x] ENS text record integration (library done)
+- [x] Resolve by ENS or address (`resolve('alice.eth')`)
+- [ ] Key generation + backup flow (in app)
+- [ ] UI to set your own ENS text records
 
 ### M4: Messenger MVP
 - [ ] Inbox view (list received wraps)

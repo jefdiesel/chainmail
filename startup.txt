@@ -1,0 +1,29 @@
+  Start Backend
+
+  npm run dev
+  Runs on: http://localhost:4040
+
+  Start Frontend (in a new terminal)
+
+  cd frontend && npm run dev
+  Runs on: http://localhost:5173
+
+  ---
+  One-liner (if you want both in background)
+
+  npm run dev & cd frontend && npm run dev
+
+  Check if servers are running
+
+  lsof -ti:4040  # Backend
+  lsof -ti:5173  # Frontend
+
+  Kill servers if needed
+
+  lsof -ti:4040 | xargs kill -9  # Kill backend
+  lsof -ti:5173 | xargs kill -9  # Kill frontend
+
+  That's it! Backend on 4040, frontend on 5173.
+
+● How did that compaction go? (optional)
+  1: Bad    2: Fine   3: Good   0: Dismiss
