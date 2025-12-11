@@ -20,6 +20,9 @@ import {
   exportRegistry,
   importRegistry,
   clearRegistry,
+  deriveKeysFromSignature,
+  exportKeys,
+  importKeys,
 } from '../dist/index.js';
 
 const assert = (condition, message) => {
@@ -169,6 +172,38 @@ async function testAddressRegistry() {
   console.log('Address registry: PASSED');
 }
 
+async function testDerivedKeys() {
+  console.log('\n=== Derived Keys ===');
+
+  // Simulate wallet signature
+  const fakeSig1 = '0xabc123...signature-from-wallet-1';
+  const fakeSig2 = '0xdef456...signature-from-wallet-2';
+
+  // Same sig = same keys
+  const keys1a = deriveKeysFromSignature(fakeSig1);
+  const keys1b = deriveKeysFromSignature(fakeSig1);
+  assert(toHex(keys1a.identity.privateKey) === toHex(keys1b.identity.privateKey), 'same sig = same identity key');
+  assert(toHex(keys1a.signedPreKey.privateKey) === toHex(keys1b.signedPreKey.privateKey), 'same sig = same prekey');
+
+  // Different sig = different keys
+  const keys2 = deriveKeysFromSignature(fakeSig2);
+  assert(toHex(keys1a.identity.privateKey) !== toHex(keys2.identity.privateKey), 'different sig = different keys');
+
+  // Export/import works
+  const exported = exportKeys(keys1a);
+  const imported = importKeys(exported);
+  assert(toHex(imported.identity.privateKey) === toHex(keys1a.identity.privateKey), 'export/import roundtrip');
+
+  // Derived keys work for encryption
+  const bob = generateFullKeyPair();
+  const calldata = wrap(keys1a, [{ id: 'bob', bundle: bob.bundle }], Buffer.from('hello derived'));
+  const decrypted = unwrap('bob', bob, calldata);
+  assert(decrypted !== null, 'derived keys can encrypt');
+  assert(Buffer.from(decrypted).toString() === 'hello derived', 'message decrypts correctly');
+
+  console.log('Derived keys: PASSED');
+}
+
 async function main() {
   console.log('=================================');
   console.log('  Wrap Protocol Test Suite');
@@ -180,6 +215,7 @@ async function main() {
     await testChunking();
     await testChunkTracker();
     await testAddressRegistry();
+    await testDerivedKeys();
 
     console.log('\n=================================');
     console.log('  ALL TESTS PASSED');

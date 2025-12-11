@@ -121,6 +121,108 @@ export function generateFullKeyPair(): FullKeyPair {
 }
 
 // ============================================================================
+// Derived Keys (from wallet signature)
+// ============================================================================
+
+const DERIVE_MESSAGE_PREFIX = 'wrap-keys-v1';
+
+/**
+ * Derive wrap keys from a wallet signature
+ * Same wallet + index = same keys, always recoverable
+ * Use index for multiple identities per wallet (0 = default)
+ */
+export async function deriveKeysFromSigner(
+  signer: { signMessage: (message: string) => Promise<string> },
+  index: number = 0
+): Promise<FullKeyPair> {
+  const message = index === 0 ? DERIVE_MESSAGE_PREFIX : `${DERIVE_MESSAGE_PREFIX}:${index}`;
+  const signature = await signer.signMessage(message);
+  return deriveKeysFromSignature(signature);
+}
+
+/**
+ * Derive wrap keys from a raw signature string
+ */
+export function deriveKeysFromSignature(signature: string): FullKeyPair {
+  // Hash signature to get seed
+  const sigBytes = new TextEncoder().encode(signature);
+  const seed = sha256(sigBytes);
+
+  // Derive two keys from seed using HKDF
+  const identitySalt = new TextEncoder().encode('wrap-identity');
+  const signedPreKeySalt = new TextEncoder().encode('wrap-signed-prekey');
+  const info = new TextEncoder().encode('wrap-keys-v1');
+  const identityPrivate = hkdf(sha256, seed, identitySalt, info, 32);
+  const signedPreKeyPrivate = hkdf(sha256, seed, signedPreKeySalt, info, 32);
+
+  const identity: KeyPair = {
+    privateKey: identityPrivate,
+    publicKey: x25519.getPublicKey(identityPrivate),
+  };
+
+  const signedPreKey: KeyPair = {
+    privateKey: signedPreKeyPrivate,
+    publicKey: x25519.getPublicKey(signedPreKeyPrivate),
+  };
+
+  return {
+    identity,
+    signedPreKey,
+    bundle: {
+      identityKey: identity.publicKey,
+      signedPreKey: signedPreKey.publicKey,
+    },
+  };
+}
+
+// ============================================================================
+// Key Export/Import (Advanced)
+// ============================================================================
+
+export interface ExportedKeys {
+  identityPrivate: string;
+  identityPublic: string;
+  signedPreKeyPrivate: string;
+  signedPreKeyPublic: string;
+}
+
+/**
+ * Export keys for backup
+ */
+export function exportKeys(keys: FullKeyPair): ExportedKeys {
+  return {
+    identityPrivate: toHex(keys.identity.privateKey),
+    identityPublic: toHex(keys.identity.publicKey),
+    signedPreKeyPrivate: toHex(keys.signedPreKey.privateKey),
+    signedPreKeyPublic: toHex(keys.signedPreKey.publicKey),
+  };
+}
+
+/**
+ * Import keys from backup
+ */
+export function importKeys(exported: ExportedKeys): FullKeyPair {
+  const identity: KeyPair = {
+    privateKey: fromHex(exported.identityPrivate),
+    publicKey: fromHex(exported.identityPublic),
+  };
+
+  const signedPreKey: KeyPair = {
+    privateKey: fromHex(exported.signedPreKeyPrivate),
+    publicKey: fromHex(exported.signedPreKeyPublic),
+  };
+
+  return {
+    identity,
+    signedPreKey,
+    bundle: {
+      identityKey: identity.publicKey,
+      signedPreKey: signedPreKey.publicKey,
+    },
+  };
+}
+
+// ============================================================================
 // Crypto Primitives
 // ============================================================================
 

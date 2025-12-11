@@ -46,6 +46,15 @@ export {
   generateKeyPair,
   generateFullKeyPair,
 
+  // Derived keys (default - from wallet)
+  deriveKeysFromSigner,
+  deriveKeysFromSignature,
+
+  // Key export/import (advanced)
+  type ExportedKeys,
+  exportKeys,
+  importKeys,
+
   // Encryption
   encryptForRecipients,
   decryptForRecipient,
